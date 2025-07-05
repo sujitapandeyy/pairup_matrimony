@@ -95,7 +95,7 @@ const ProfileCards = () => {
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{currentProfile.location}</span>
+                  <span className="text-sm">{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Briefcase className="w-4 h-4" />
@@ -153,15 +153,7 @@ const ProfileCards = () => {
         </Card>
       </div>
 
-      {/* {showMatch && matchedProfile && (
-        <MatchModal
-          profile={matchedProfile}
-          onClose={() => {
-            setShowMatch(false);
-            setMatchedProfile(null);
-          }}
-        />
-      )} */}
+      
     </div>
   );
 };

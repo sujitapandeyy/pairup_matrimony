@@ -6,44 +6,64 @@ import NavBar from '@/components/NavBar';
 import ProfileCards from './ProfileCards';
 import ProfilePage from '@/components/ProfilePage';
 import Requests from '@/components/Request';
-import ChatInterface from './chat/ChatInterface';
+import ChatInterface from '../../components/ChatInterface';
+import { toast, Toaster } from 'sonner';
 
 const Page = () => {
   const router = useRouter();
+
   const [currentView, setCurrentView] = useState<'discover' | 'matches' | 'chat' | 'profile' | 'requests'>('discover');
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [requests, setRequests] = useState<any[]>([]); 
+  const [requests, setRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    const storedView = localStorage.getItem('currentView');
+    if (storedView) setCurrentView(storedView as any);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('currentView', currentView);
+  }, [currentView]);
 
   useEffect(() => {
     const user = localStorage.getItem('pairupUser');
     if (!user) {
+      toast.error('Please log in');
       router.push('/login');
     } else {
-      const parsed = JSON.parse(user);
-      const isCompleted = parsed.interests_completed === true || parsed.interests_completed === 'true';
+      try {
+        const parsed = JSON.parse(user);
+        const isCompleted = parsed.interests_completed === true || parsed.interests_completed === 'true';
 
-      if (!isCompleted) {
-        router.push('/interests');
-      } else {
-        setUserId(parsed._id || parsed.id || null);  
-        setUserEmail(parsed.email || null);
-        setLoading(false);
+        if (!isCompleted) {
+          toast.warning('Complete your profile to continue');
+          router.push('/interests');
+        } else {
+          setUserId(parsed._id || parsed.id || null);
+          setUserEmail(parsed.email || null);
+          setLoading(false);
+        }
+      } catch (err) {
+        toast.error('Failed to parse user');
       }
     }
   }, [router]);
 
   useEffect(() => {
     if (!userEmail) return;
-
     fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setRequests(data || []);
+      .then(res => res.json())
+      .then(data => {
+        const requestNotifications = data.filter((n: any) => n.type === 'request');
+        setRequests(requestNotifications || []);
       })
-      .catch((err) => console.error("Failed to load notifications", err));
+      .catch(err => {
+        console.error("Failed to load notifications", err);
+        toast.error('Failed to load match requests');
+      });
   }, [userEmail]);
 
   if (loading || !userId) {
@@ -55,7 +75,8 @@ const Page = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-25 to-red-50">
+    <div className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50">
+      <Toaster position="top-center" richColors />
       <NavBar
         currentView={currentView}
         setCurrentView={setCurrentView}
@@ -67,7 +88,13 @@ const Page = () => {
           <ChatInterface onSelectChat={setSelectedChat} selectedChat={selectedChat} />
         )}
         {currentView === 'profile' && <ProfilePage userId={userId} />}
-        {currentView === 'requests' && <Requests notifications={requests} />}
+        {currentView === 'requests' && (
+          <Requests
+            requests={requests}
+            setRequests={setRequests}
+            setCurrentView={setCurrentView} // 🔥 passed here
+          />
+        )}
       </main>
     </div>
   );

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
 
-// Dynamically import to avoid hydration errors
 const LocationInput = dynamic(() => import('@/components/LocationInput'), { ssr: false })
 
 export default function Registration() {
@@ -31,14 +30,14 @@ const [detailsData, setDetailsData] = useState({
 
 
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
-  const [imageFile, setImageFile] = useState<Blob | null>(null)
-  const [showWebcam, setShowWebcam] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // const [result, setResult] = useState<string | null>(null)
+  // const [imageFile, setImageFile] = useState<Blob | null>(null)
+  // const [showWebcam, setShowWebcam] = useState(false)
+  // const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  // const fileInputRef = useRef<HTMLInputElement>(null)
+  // const videoRef = useRef<HTMLVideoElement>(null)
+  // const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const storedUser = localStorage.getItem('pairupUser')
@@ -73,124 +72,135 @@ const [detailsData, setDetailsData] = useState({
     setDetailsData({ ...detailsData, personality: updated })
   }
 
-  const captureFromWebcam = async () => {
-    setResult(null)
-    setShowWebcam(true)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-      }
-    } catch {
-      toast.error('Webcam access denied')
-      setShowWebcam(false)
-    }
-  }
+  // const captureFromWebcam = async () => {
+  //   setResult(null)
+  //   setShowWebcam(true)
+  //   try {
+  //     const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+  //     if (videoRef.current) {
+  //       videoRef.current.srcObject = stream
+  //       videoRef.current.play()
+  //     }
+  //   } catch {
+  //     toast.error('Webcam access denied')
+  //     setShowWebcam(false)
+  //   }
+  // }
 
-  const stopWebcam = () => {
-    setShowWebcam(false)
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream
-      stream.getTracks().forEach((track) => track.stop())
-      videoRef.current.srcObject = null
-    }
-  }
+  // const stopWebcam = () => {
+  //   setShowWebcam(false)
+  //   if (videoRef.current?.srcObject) {
+  //     const stream = videoRef.current.srcObject as MediaStream
+  //     stream.getTracks().forEach((track) => track.stop())
+  //     videoRef.current.srcObject = null
+  //   }
+  // }
 
-  const takePhoto = () => {
-    if (canvasRef.current && videoRef.current) {
-      const context = canvasRef.current.getContext('2d')
-      if (context) {
-        context.drawImage(videoRef.current, 0, 0, 280, 280)
-        canvasRef.current.toBlob((blob) => {
-          if (blob) {
-            setImageFile(blob)
-            setPreviewUrl(URL.createObjectURL(blob))
-            sendToBackend(blob)
-            stopWebcam()
-          }
-        }, 'image/jpeg')
-      }
-    }
-  }
+  // const takePhoto = () => {
+  //   if (canvasRef.current && videoRef.current) {
+  //     const context = canvasRef.current.getContext('2d')
+  //     if (context) {
+  //       context.drawImage(videoRef.current, 0, 0, 280, 280)
+  //       canvasRef.current.toBlob((blob) => {
+  //         if (blob) {
+  //           setImageFile(blob)
+  //           setPreviewUrl(URL.createObjectURL(blob))
+  //           sendToBackend(blob)
+  //           stopWebcam()
+  //         }
+  //       }, 'image/jpeg')
+  //     }
+  //   }
+  // }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      setPreviewUrl(URL.createObjectURL(file))
-      sendToBackend(file)
-      stopWebcam()
-    }
-  }
+  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0]
+  //   if (file) {
+  //     setImageFile(file)
+  //     setPreviewUrl(URL.createObjectURL(file))
+  //     sendToBackend(file)
+  //     stopWebcam()
+  //   }
+  // }
 
-  const sendToBackend = async (file: Blob | File | null) => {
-    if (!file) return
-    setLoading(true)
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1]
-      try {
-        const res = await fetch('http://127.0.0.1:5050/face/detect-age', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 }),
-        })
-        const data = await res.json()
-        const ageData = data.data?.[0]
-        if (res.ok && ageData) {
-          if (ageData.min_age < 18) {
-            toast.error(`Access Denied: ${ageData.age_range}`)
-            setResult(`Access Denied. Age range: ${ageData.age_range}`)
-          } else {
-            toast.success(`Access Granted: ${ageData.age_range}`)
-            setResult(`Access Granted. Age range: ${ageData.age_range}`)
-          }
-        } else {
-          toast.error(data.message || 'Detection failed')
-        }
-      } catch {
-        toast.error('Server error')
-      } finally {
-        setLoading(false)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
+  // const sendToBackend = async (file: Blob | File | null) => {
+  //   if (!file) return
+  //   setLoading(true)
+  //   const reader = new FileReader()
+  //   reader.onloadend = async () => {
+  //     const base64 = (reader.result as string).split(',')[1]
+  //     try {
+  //       const res = await fetch('http://127.0.0.1:5050/face/detect-age', {
+  //         method: 'POST',
+  //         headers: { 'Content-Type': 'application/json' },
+  //         body: JSON.stringify({ image: base64 }),
+  //       })
+  //       const data = await res.json()
+  //       const ageData = data.data?.[0]
+  //       if (res.ok && ageData) {
+  //         if (ageData.min_age < 18) {
+  //           toast.error(`Access Denied: ${ageData.age_range}`)
+  //           setResult(`Access Denied. Age range: ${ageData.age_range}`)
+  //         } else {
+  //           toast.success(`Access Granted: ${ageData.age_range}`)
+  //           setResult(`Access Granted. Age range: ${ageData.age_range}`)
+  //         }
+  //       } else {
+  //         toast.error(data.message || 'Detection failed')
+  //       }
+  //     } catch {
+  //       toast.error('Server error')
+  //     } finally {
+  //       setLoading(false)
+  //     }
+  //   }
+  //   reader.readAsDataURL(file)
+  // }
 
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!imageFile) return toast.error('Upload or capture an image first')
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1]
-      try {
-        const res = await fetch('http://127.0.0.1:5050/face/detect-age', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 }),
-        })
-        const data = await res.json()
-        const minAge = data.data?.[0]?.min_age
-        if (minAge < 18) {
-          toast.error('Must be 18+ to register')
-          return
-        }
-        setResult(null)
+      if (!formData.name || !formData.email || !formData.password) {
+    toast.error('Please fill out all fields')
+    return
+  }
+
+  if (formData.password.length < 6) {
+    toast.error('Password must be at least 6 characters')
+    return
+  }
+    // if (!imageFile) return toast.error('Upload or capture an image first')
+    // const reader = new FileReader()
+    // reader.onloadend = async () => {
+      // const base64 = (reader.result as string).split(',')[1]
+      // try {
+        // const res = await fetch('http://127.0.0.1:5050/face/detect-age', {
+          // method: 'POST',
+          // headers: { 'Content-Type': 'application/json' },
+          // body: JSON.stringify({ image: base64 }),
+        // })
+        // const data = await res.json()
+        // const minAge = data.data?.[0]?.min_age
+        // if (minAge < 18) {
+          // toast.error('Must be 18+ to register')
+          // return
+        // }
+        // setResult(null)
         setStep(2)
-      } catch {
-        toast.error('Error contacting server')
-      }
-    }
-    reader.readAsDataURL(imageFile)
+      // } catch {
+      //   toast.error('Error contacting server')
+      // }
+    // }
+    // reader.readAsDataURL(imageFile)
   }
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const {
-      age, gender, religion, location, maritalStatus,
-      education, profession, personality, caption,
-    } = detailsData
+   const {
+  age, gender, religion, location, maritalStatus,
+  education, profession, personality, caption,
+  latitude, longitude
+} = detailsData
+
 
     if (!age || !gender || !religion || !location || !maritalStatus ||
       !education || !profession || personality.length === 0) {
@@ -200,17 +210,22 @@ const [detailsData, setDetailsData] = useState({
     if (parseInt(age) < 18) {
       return toast.error('Age must be 18+')
     }
+    if (!latitude || !longitude) {
+  return toast.error('Invalid location details. Please provide valid location.')
+}
 
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1]
+     setLoading(true)
+
+    // const reader = new FileReader()
+    // reader.onloadend = async () => {
+    //   const base64 = (reader.result as string).split(',')[1]
       try {
         const res = await fetch('http://localhost:5050/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
-            image: base64,
+            // image: base64,
             details: detailsData,
           }),
         })
@@ -228,9 +243,10 @@ const [detailsData, setDetailsData] = useState({
         }
       } catch {
         toast.error('Server error')
+ } finally {
+    setLoading(false)
       }
-    }
-    reader.readAsDataURL(imageFile)
+    // reader.readAsDataURL(imageFile)
   }
 
   const interestsList = [
@@ -296,15 +312,15 @@ const [detailsData, setDetailsData] = useState({
               required
             />
 
-            <div className="flex flex-wrap justify-between gap-3 mt-2">
+            {/* <div className="flex flex-wrap justify-between gap-3 mt-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex-1 bg-orange-600 hover:bg-orange-500 text-white font-semibold py-3 rounded-lg shadow-md transition"
               >
                 Upload Image
-              </button>
-              <button
+              </button> */}
+              {/* <button
                 type="button"
                 onClick={captureFromWebcam}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg shadow-md transition"
@@ -329,17 +345,17 @@ const [detailsData, setDetailsData] = useState({
                   </button>
                 </>
               )}
-            </div>
+            </div> */}
 
-            <input
+            {/* <input
               type="file"
               accept="image/*"
               className="hidden"
               ref={fileInputRef}
               onChange={handleFileChange}
-            />
+            /> */}
 
-            {showWebcam && (
+            {/* {showWebcam && (
               <div className="mt-6 flex justify-center">
                 <video
                   ref={videoRef}
@@ -351,10 +367,10 @@ const [detailsData, setDetailsData] = useState({
                   playsInline
                 />
               </div>
-            )}
-            <canvas ref={canvasRef} width="280" height="280" className="hidden" />
+            )} */}
+            {/* <canvas ref={canvasRef} width="280" height="280" className="hidden" /> */}
 
-            {previewUrl && (
+            {/* {previewUrl && (
               <div className="mt-4 text-center">
                 <p className="text-sm font-medium text-gray-700 mb-2">Selected Image Preview:</p>
                 <img
@@ -373,7 +389,7 @@ const [detailsData, setDetailsData] = useState({
               >
                 {result}
               </p>
-            )}
+            )} */}
 
             {loading && (
               <p className="text-center mt-3 text-gray-600 font-semibold">Processing...</p>

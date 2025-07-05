@@ -6,7 +6,17 @@ import ProfileView from "./ProfileView";
 import EditProfile from "./EditProfile";
 import { Profile, ProfilePageProps } from "./types";
 
+const backendUrl = "http://localhost:5050";
+
 const ageGroupOptions = ["18-25", "26-35", "36-45", "46+"];
+
+function getFullImageUrl(photoPath?: string | null) {
+  if (!photoPath) return "/default-profile.png";
+  if (photoPath.startsWith("/uploads/")) {
+    return `${backendUrl}${photoPath}?t=${Date.now()}`;
+  }
+  return photoPath;
+}
 
 export default function ProfilePage({ userId }: ProfilePageProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -27,7 +37,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
     async function fetchProfile() {
       try {
-        const res = await fetch(`http://localhost:5050/api/user/profile/${userId}`, {
+        const res = await fetch(`${backendUrl}/api/user/profile/${userId}`, {
           credentials: 'include'
         });
         if (!res.ok) {
@@ -37,7 +47,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
         const data: Profile = await res.json();
         setProfile(data);
         setFormData(data);
-        setPhotoPreview(data.photo ? `http://localhost:5050${data.photo}?t=${Date.now()}` : null);
+        setPhotoPreview(getFullImageUrl(data.photo));
       } catch (err: any) {
         setError(err.message || "Failed to load profile");
       } finally {
@@ -51,14 +61,14 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   useEffect(() => {
     if (profile) {
       setFormData(profile);
-      setPhotoPreview(profile.photo ? `http://localhost:5050${profile.photo}?t=${Date.now()}` : null);
+      setPhotoPreview(getFullImageUrl(profile.photo));
     }
   }, [profile]);
 
   async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    
+
     const MAX_FILE_SIZE = 5 * 1024 * 1024; 
     if (file.size > MAX_FILE_SIZE) {
       setUploadError('File size should be less than 5MB');
@@ -71,31 +81,31 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     const reader = new FileReader();
     reader.onloadend = () => setPhotoPreview(reader.result as string);
     reader.readAsDataURL(file);
-    
+
     const formDataFile = new FormData();
     formDataFile.append("photo", file);
 
     try {
-      const res = await fetch(`http://localhost:5050/api/user/profile/${userId}/upload-photo`, {
+      const res = await fetch(`${backendUrl}/api/user/profile/${userId}/upload-photo`, {
         method: "POST",
         body: formDataFile,
         credentials: 'include',
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Photo upload failed");
       }
-      
+
       const data = await res.json();
-      const updatedUrl = `http://localhost:5050${data.photoUrl}?t=${Date.now()}`;
+      const updatedUrl = getFullImageUrl(data.photoUrl);
       setFormData((prev) => ({ ...prev, photo: data.photoUrl }));
       setProfile((prev) => prev ? { ...prev, photo: data.photoUrl } : null);
       setPhotoPreview(updatedUrl);
     } catch (err: any) {
       console.error('Photo upload error:', err);
       setUploadError(err.message || "Failed to upload photo");
-      setPhotoPreview(profile?.photo ? `http://localhost:5050${profile.photo}?t=${Date.now()}` : null);
+      setPhotoPreview(profile?.photo ? getFullImageUrl(profile.photo) : null);
     } finally {
       setUploadingPhoto(false);
     }
@@ -120,18 +130,18 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:5050/api/user/profile/${userId}`, {
+      const res = await fetch(`${backendUrl}/api/user/profile/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
         credentials: 'include',
       });
-      
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to update profile");
       }
-      
+
       const updatedProfile = await res.json();
       setProfile(updatedProfile);
       setIsEditing(false);
@@ -150,7 +160,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
       </div>
     </div>
   );
-  
+
   if (error) return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
       <div className="text-center text-red-500 bg-white p-8 rounded-xl shadow-lg">
@@ -159,7 +169,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
       </div>
     </div>
   );
-  
+
   if (!profile) return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
       <div className="text-center text-yellow-600 bg-white p-8 rounded-xl shadow-lg">
@@ -173,9 +183,9 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
       <div className="relative h-80 bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-500 overflow-hidden">
         <div className="absolute inset-0 bg-pink-800 bg-opacity-20"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
-        
+
         <div className="absolute bottom-0 mb-20 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-          <div className="w-40 h-40 rounded-full border-6 border-white shadow-xl overflow-hidden bg-white">
+          <div className="w-40 h-40 rounded-full border-6 border-white shadow-xl overflow-hidden bg-white relative">
             <img
               src={displayedPhoto}
               alt="Profile"
@@ -194,7 +204,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
             onClick={() => {
               setIsEditing((prev) => !prev);
               if (!isEditing) setFormData(profile);
-              setPhotoPreview(profile.photo ? `http://localhost:5050${profile.photo}?t=${Date.now()}` : null);
+              setPhotoPreview(profile.photo ? getFullImageUrl(profile.photo) : null);
             }}
             className="bg-white bg-opacity-20 backdrop-blur-sm text-white px-6 py-3 rounded-full hover:bg-opacity-30 transition-all duration-200 flex items-center gap-2 font-medium"
           >
@@ -246,9 +256,9 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
             photoPreview={photoPreview}
           />
         ) : (
-          <ProfileView 
-            profile={profile} 
-            onEditClick={() => setIsEditing(true)} 
+          <ProfileView
+            profile={profile}
+            onEditClick={() => setIsEditing(true)}
           />
         )}
       </div>

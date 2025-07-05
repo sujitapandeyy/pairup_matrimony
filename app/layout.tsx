@@ -26,7 +26,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* <NavBar currentView={currentView} setCurrentView={setCurrentView} /> */}
         {children}
-              <Toaster richColors position="top-center" duration={2000}/>
+              <Toaster richColors position="bottom-right" duration={2000}/>
 
       </body>
     </html>
