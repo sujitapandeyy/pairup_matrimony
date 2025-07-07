@@ -13,6 +13,7 @@ interface Match {
   lastMessage?: string;
   lastTimestamp?: string;
   lastSender?: string;
+  lastRead?: string;
 }
 
 interface Message {
@@ -25,6 +26,7 @@ interface Message {
 interface ChatInterfaceProps {
   onSelectChat: (chat: Match | null) => void;
   selectedChat: Match | null;
+  onUnreadCountChange: (count: number) => void;
 }
 
 const SOCKET_SERVER_URL = 'http://localhost:5050';
@@ -34,27 +36,19 @@ const normalizeTimestamp = (ts?: string) => {
   return ts.endsWith('Z') ? ts : ts + 'Z';
 };
 
-const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
+const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: ChatInterfaceProps) => {
   const [matches, setMatches] = useState<Match[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loggedInEmail, setLoggedInEmail] = useState('');
   const [newMessage, setNewMessage] = useState('');
-  const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, string>>({});
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // Store all online users emails
+
   const socketRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const selectedChatRef = useRef<Match | null>(null);
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
-  }, [selectedChat]);
-
-  useEffect(() => {
-    if (selectedChat && selectedChat.lastTimestamp) {
-      setLastReadTimestamps((prev) => ({
-        ...prev,
-        [selectedChat.email]: selectedChat.lastTimestamp ?? '',
-      }));
-    }
   }, [selectedChat]);
 
   const formatTime = (timestamp?: string) => {
@@ -68,6 +62,16 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
       hour12: true,
       timeZone: 'Asia/Kathmandu',
     }).format(date);
+  };
+
+  const fetchReadReceipt = async (user: string, chatWith: string) => {
+    try {
+      const res = await fetch(`${SOCKET_SERVER_URL}/chat/read_receipt?user=${user}&chat_with=${chatWith}`);
+      const data = await res.json();
+      return data?.last_read || null;
+    } catch {
+      return null;
+    }
   };
 
   const fetchChatHistory = async (user1: string, user2: string): Promise<Message[]> => {
@@ -97,11 +101,13 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
         rawMatches.map(async (match: Match) => {
           const history = await fetchChatHistory(loggedInEmail, match.email);
           const last = history[history.length - 1];
+          const lastRead = await fetchReadReceipt(loggedInEmail, match.email);
           return {
             ...match,
             lastMessage: last?.message,
-            lastTimestamp: last ? normalizeTimestamp(last.timestamp) : undefined,
+            lastTimestamp: last?.timestamp,
             lastSender: last?.sender,
+            lastRead: lastRead ? normalizeTimestamp(lastRead) : undefined,
             online: false,
           };
         })
@@ -114,19 +120,28 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
       });
 
       setMatches(matchesWithMeta);
+
+      // Calculate total unread messages count across all matches:
+      const unreadCount = matchesWithMeta.reduce((acc, m) => {
+        const unread =
+          m.lastMessage &&
+          m.lastSender !== loggedInEmail &&
+          (!m.lastRead || new Date(m.lastTimestamp || '').getTime() > new Date(m.lastRead).getTime());
+        return acc + (unread ? 1 : 0);
+      }, 0);
+
+      onUnreadCountChange(unreadCount);
     } catch (err) {
       console.error('Failed to load matches:', err);
     }
-  }, [loggedInEmail]);
+  }, [loggedInEmail, onUnreadCountChange]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('pairupUser');
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        if (user.email) {
-          setLoggedInEmail(user.email);
-        }
+        if (user.email) setLoggedInEmail(user.email);
       } catch {}
     }
   }, []);
@@ -138,10 +153,12 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
     socketRef.current = socket;
 
     socket.on('online_users', (onlineEmails: string[]) => {
+      setOnlineUsers(onlineEmails); // Save full online users list
+
       setMatches((prev) =>
         prev.map((match) => ({
           ...match,
-          online: onlineEmails.includes(match.email),
+          online: onlineEmails.includes(match.email), // Update match online status
         }))
       );
     });
@@ -156,10 +173,6 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
 
       if (isForCurrentChat) {
         setMessages((prev) => [...prev, newMsg]);
-        setLastReadTimestamps((prev) => ({
-          ...prev,
-          [currentChat.email]: fixedTimestamp,
-        }));
       }
 
       setMatches((prev) => {
@@ -203,6 +216,25 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
       setMessages([]);
     }
   }, [selectedChat, loggedInEmail]);
+
+  useEffect(() => {
+    if (selectedChat?.email && loggedInEmail && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.timestamp) {
+        fetch(`${SOCKET_SERVER_URL}/chat/read_receipt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user: loggedInEmail,
+            chat_with: selectedChat.email,
+            timestamp: lastMsg.timestamp,
+          }),
+        }).then(() => {
+          fetchMatches(); // Refresh sidebar read state & unread counts
+        });
+      }
+    }
+  }, [selectedChat, messages, loggedInEmail, fetchMatches]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -251,9 +283,10 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
                 const unread =
                   match.lastMessage &&
                   match.lastSender !== loggedInEmail &&
-                  (!lastReadTimestamps[match.email] ||
+                  (!match.lastRead ||
                     new Date(match.lastTimestamp || '').getTime() >
-                      new Date(lastReadTimestamps[match.email]).getTime());
+                      new Date(match.lastRead).getTime());
+
                 return (
                   <div
                     key={match.email}
@@ -269,14 +302,21 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
                           alt={match.name}
                           className="w-14 h-14 rounded-full object-cover border-2 border-gray-100"
                         />
-                        {match.online && (
-                          <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
-                        )}
-                      </div>
+                      
+                         {onlineUsers.includes(match.email) && (
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                )}
+                      {/* <p className="text-sm text-gray-500">
+                {onlineUsers.includes(match.email) ? 'Online' : 'Offline'} • {match.location || ''}
+              </p> */}
+                      {/* {match.online && (
+                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
+                      )} */}
+                    </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">{match.name}</h3>
                         <p className={`text-sm truncate ${unread ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
-                          {match.lastMessage || 'Start chatting'}
+                          {match.lastMessage || 'Start chatting...'}
                         </p>
                       </div>
                     </div>
@@ -300,27 +340,39 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
           </div>
         ) : (
           <>
-            <div className="bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <img
-                    src={selectedChat.images?.[0] || '/default-profile.jpg'}
-                    alt={selectedChat.name}
-                    className="w-12 h-12 rounded-full object-cover border border-gray-200"
-                  />
-                  {selectedChat.online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {selectedChat.online ? 'Online' : 'Offline'} • {selectedChat.location || ''}
-                  </p>
-                </div>
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
+              {/* Partner */}
+              <div className="relative">
+                <img
+                  src={selectedChat.images?.[0] || '/default-profile.jpg'}
+                  alt={selectedChat.name}
+                  className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                />
+                {onlineUsers.includes(selectedChat.email) && (
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                )}
               </div>
+
+              <div>
+                <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
+                <p className="text-sm text-gray-500">
+                  {onlineUsers.includes(selectedChat.email) ? 'Online' : 'Offline'} • {selectedChat.location || ''}
+                </p>
+              </div>
+
+              {/* Logged-in User Online Indicator */}
+              {/* <div className="ml-auto flex items-center gap-2">
+                <span className="text-sm text-gray-600">You</span>
+                <div
+                  className={`w-3 h-3 rounded-full border-2 border-gray-300 ${
+                    onlineUsers.includes(loggedInEmail) ? 'bg-green-500' : 'bg-gray-300'
+                  }`}
+                />
+              </div> */}
             </div>
 
+            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center text-gray-400 italic pt-20">No messages yet. Say hello! 👋</div>
@@ -363,6 +415,7 @@ const ChatInterface = ({ onSelectChat, selectedChat }: ChatInterfaceProps) => {
               <div ref={chatEndRef}></div>
             </div>
 
+            {/* Input */}
             <div className="p-4 bg-white border-t border-gray-200">
               <div className="flex items-center gap-3">
                 <input

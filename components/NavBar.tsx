@@ -27,6 +27,7 @@ const NavBar = ({
         const user = JSON.parse(storedUser);
         if (user.name) setUserName(user.name);
       } catch {
+        // ignore parse errors
       }
     }
   }, []);

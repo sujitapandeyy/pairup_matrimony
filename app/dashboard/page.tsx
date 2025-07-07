@@ -29,6 +29,7 @@ const Page = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, string>>({});
+  const [liveUnreadCount, setLiveUnreadCount] = useState(0);
 
   // Load currentView from localStorage
   useEffect(() => {
@@ -129,18 +130,21 @@ const Page = () => {
     }
   }, [selectedChat]);
 
-  // Calculate unread message count
-  const unreadMessageCount = matches.reduce((count, match) => {
-    if (
-      match.lastMessage &&
-      match.lastSender !== userEmail && // message is from other user
-      (!lastReadTimestamps[match.email] ||
-        new Date(match.lastTimestamp || '').getTime() > new Date(lastReadTimestamps[match.email] || '').getTime())
-    ) {
-      return count + 1;
-    }
-    return count;
-  }, 0);
+  // Calculate unread message count and update liveUnreadCount state
+  useEffect(() => {
+    const count = matches.reduce((acc, match) => {
+      if (
+        match.lastMessage &&
+        match.lastSender !== userEmail && // message is from other user
+        (!lastReadTimestamps[match.email] ||
+          new Date(match.lastTimestamp || '').getTime() > new Date(lastReadTimestamps[match.email] || '').getTime())
+      ) {
+        return acc + 1;
+      }
+      return acc;
+    }, 0);
+    setLiveUnreadCount(count);
+  }, [matches, lastReadTimestamps, userEmail]);
 
   if (loading || !userId) {
     return (
@@ -157,7 +161,7 @@ const Page = () => {
         currentView={currentView}
         setCurrentView={setCurrentView}
         requestCount={requests.length}
-        unreadMessageCount={unreadMessageCount}
+        unreadMessageCount={liveUnreadCount}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
         {currentView === 'discover' && <ProfileCards />}
@@ -165,6 +169,7 @@ const Page = () => {
           <ChatInterface
             onSelectChat={setSelectedChat}
             selectedChat={selectedChat}
+            onUnreadCountChange={setLiveUnreadCount} // Pass handler for live update
           />
         )}
         {currentView === 'profile' && <ProfilePage userId={userId} />}
