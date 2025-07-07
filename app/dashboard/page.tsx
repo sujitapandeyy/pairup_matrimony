@@ -9,25 +9,39 @@ import Requests from '@/components/Request';
 import ChatInterface from '../../components/ChatInterface';
 import { toast, Toaster } from 'sonner';
 
+interface Match {
+  name: string;
+  email: string;
+  images: string[];
+  lastMessage?: string;
+  lastTimestamp?: string;
+  lastSender?: string;
+}
+
 const Page = () => {
   const router = useRouter();
 
   const [currentView, setCurrentView] = useState<'discover' | 'matches' | 'chat' | 'profile' | 'requests'>('discover');
-  const [selectedChat, setSelectedChat] = useState<any>(null);
+  const [selectedChat, setSelectedChat] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, string>>({});
 
+  // Load currentView from localStorage
   useEffect(() => {
     const storedView = localStorage.getItem('currentView');
     if (storedView) setCurrentView(storedView as any);
   }, []);
 
+  // Save currentView to localStorage
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
 
+  // Load logged-in user info
   useEffect(() => {
     const user = localStorage.getItem('pairupUser');
     if (!user) {
@@ -52,19 +66,81 @@ const Page = () => {
     }
   }, [router]);
 
+  // Fetch match requests notifications
   useEffect(() => {
     if (!userEmail) return;
     fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const requestNotifications = data.filter((n: any) => n.type === 'request');
         setRequests(requestNotifications || []);
       })
-      .catch(err => {
-        console.error("Failed to load notifications", err);
+      .catch((err) => {
+        console.error('Failed to load notifications', err);
         toast.error('Failed to load match requests');
       });
   }, [userEmail]);
+
+  // Fetch mutual matches with last message info
+  useEffect(() => {
+    if (!userEmail) return;
+
+    async function fetchMatches() {
+      try {
+        const res = await fetch(
+          `http://localhost:5050/matches/get_mutual_matches?email=${encodeURIComponent(userEmail ?? '')}`
+        );
+        const data = await res.json();
+
+        const matchesWithMeta: Match[] = await Promise.all(
+          data.matches.map(async (match: Match) => {
+            // Fetch last message between user and match
+            const chatRes = await fetch(
+              `http://localhost:5050/chat/history?user1=${encodeURIComponent(userEmail ?? '')}&user2=${encodeURIComponent(match.email)}`
+            );
+            const chatData = await chatRes.json();
+            const lastMsg = chatData.messages?.[chatData.messages.length - 1];
+            return {
+              ...match,
+              lastMessage: lastMsg?.message || '',
+              lastTimestamp: lastMsg?.timestamp || '',
+              lastSender: lastMsg?.sender || '',
+            };
+          })
+        );
+
+        setMatches(matchesWithMeta);
+      } catch (err) {
+        console.error('Failed to fetch matches', err);
+        toast.error('Failed to fetch matches');
+      }
+    }
+
+    fetchMatches();
+  }, [userEmail]);
+
+  // Update lastReadTimestamps when user selects a chat
+  useEffect(() => {
+    if (selectedChat && selectedChat.lastTimestamp) {
+      setLastReadTimestamps((prev) => ({
+        ...prev,
+        [selectedChat.email]: selectedChat.lastTimestamp || '',
+      }));
+    }
+  }, [selectedChat]);
+
+  // Calculate unread message count
+  const unreadMessageCount = matches.reduce((count, match) => {
+    if (
+      match.lastMessage &&
+      match.lastSender !== userEmail && // message is from other user
+      (!lastReadTimestamps[match.email] ||
+        new Date(match.lastTimestamp || '').getTime() > new Date(lastReadTimestamps[match.email] || '').getTime())
+    ) {
+      return count + 1;
+    }
+    return count;
+  }, 0);
 
   if (loading || !userId) {
     return (
@@ -81,18 +157,22 @@ const Page = () => {
         currentView={currentView}
         setCurrentView={setCurrentView}
         requestCount={requests.length}
+        unreadMessageCount={unreadMessageCount}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
         {currentView === 'discover' && <ProfileCards />}
         {currentView === 'matches' && (
-          <ChatInterface onSelectChat={setSelectedChat} selectedChat={selectedChat} />
+          <ChatInterface
+            onSelectChat={setSelectedChat}
+            selectedChat={selectedChat}
+          />
         )}
         {currentView === 'profile' && <ProfilePage userId={userId} />}
         {currentView === 'requests' && (
           <Requests
             requests={requests}
             setRequests={setRequests}
-            setCurrentView={setCurrentView} // 🔥 passed here
+            setCurrentView={setCurrentView}
           />
         )}
       </main>

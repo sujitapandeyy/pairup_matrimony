@@ -1,16 +1,11 @@
-from flask import Flask, send_from_directory
+from flask import Flask
 from flask_cors import CORS
 from flask_session import Session
 from flask_pymongo import PyMongo
-from flask_socketio import SocketIO, join_room, emit
-import os
+from config import Config
+from socket_events import socketio, register_socketio_events
 
 app = Flask(__name__)
-
-app.config["UPLOAD_FOLDER"] = os.path.join(os.getcwd(), "uploads")
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
-from config import Config
 app.config.from_object(Config)
 
 mongo = PyMongo(app)
@@ -18,31 +13,23 @@ app.mongo = mongo
 
 Session(app)
 CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
-socketio = SocketIO(app, cors_allowed_origins="http://localhost:3000")
-users = {} 
-def hello():
-    return "SocketIO backend running"
 
-@app.route('/uploads/<path:filename>')
-def serve_uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+register_socketio_events(app)
 
-# Import Blueprints
 from routes.register import register_bp
 from routes.login import login_bp
 from routes.interest import interest_bp
 from routes.profile import profile_bp
 from routes.match import match_bp
-from routes.faceregister import face_bp 
+from routes.chat import chat_bp
 
-# Register Blueprints
 app.register_blueprint(register_bp, url_prefix='/auth')
 app.register_blueprint(login_bp, url_prefix='/auth')
 app.register_blueprint(interest_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(match_bp, url_prefix='/matches')
-app.register_blueprint(face_bp, url_prefix='/face')
-
+app.register_blueprint(chat_bp, url_prefix='/chat')
 
 if __name__ == '__main__':
+    socketio.init_app(app)
     socketio.run(app, host='127.0.0.1', port=5050, debug=True)

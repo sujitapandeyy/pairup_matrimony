@@ -10,7 +10,6 @@ class MatchService:
         self.matches = db["matches"]
 
     def build_photo_url(self, request, raw_photo):
-        # Return full URL for photo, or default profile if none
         base_url = request.host_url.rstrip('/')
         if raw_photo:
             if raw_photo.startswith("/uploads/"):
@@ -19,7 +18,6 @@ class MatchService:
         return f"{base_url}/default-profile.jpg"
 
     def get_profiles(self, request, current_email):
-        # Get profiles excluding self and those already liked by current user
         liked_emails = {s["target"] for s in self.swipes.find({"swiper": current_email, "liked": True})}
         liked_by_emails = {s["swiper"] for s in self.swipes.find({"target": current_email, "liked": True})}
 
@@ -49,30 +47,25 @@ class MatchService:
         return profiles
 
     def swipe(self, swiper, target, liked):
-        # Record swipe (like or dislike)
         self.swipes.update_one(
             {"swiper": swiper, "target": target},
             {"$set": {"liked": liked, "timestamp": datetime.utcnow()}},
             upsert=True
         )
 
-        # Remove incoming request notification because swiper responded to target's like
         self.notifications.delete_many({"to": swiper, "from": target, "type": "request"})
 
         if liked:
-            # Check if target liked swiper too — mutual match
             reverse = self.swipes.find_one({"swiper": target, "target": swiper, "liked": True})
             match = self.matches.find_one({"users": {"$all": [swiper, target]}})
 
             if reverse and not match:
-                # Create a new match document
                 match_doc = {
                     "users": sorted([swiper, target]),
                     "timestamp": datetime.utcnow()
                 }
                 match_id = self.matches.insert_one(match_doc).inserted_id
 
-                # Notify both users of the match
                 for user1, user2 in [(swiper, target), (target, swiper)]:
                     self.notifications.insert_one({
                         "to": user1,
@@ -86,7 +79,6 @@ class MatchService:
                 return {"match": True, "match_id": str(match_id)}
 
             else:
-                # If no mutual match, send a like request notification to target
                 self.notifications.insert_one({
                     "to": target,
                     "from": swiper,
@@ -97,7 +89,6 @@ class MatchService:
                 })
 
         else:
-            # If unliked, remove match & notifications if exists
             match = self.matches.find_one({"users": {"$all": [swiper, target]}})
             if match:
                 self.matches.delete_one({"_id": match["_id"]})
@@ -137,14 +128,12 @@ class MatchService:
         return notes
 
     def mark_read(self, notification_id):
-        # Mark a notification as read
         return self.notifications.update_one(
             {"_id": ObjectId(notification_id)},
             {"$set": {"read": True}}
         )
 
     def ignore(self, notification_id):
-        # Ignore a request notification
         notification = self.notifications.find_one({"_id": ObjectId(notification_id)})
         if not notification:
             return False
@@ -152,7 +141,6 @@ class MatchService:
         self.notifications.delete_one({"_id": ObjectId(notification_id)})
 
         if notification["type"] == "request":
-            # Mark swipe as disliked to avoid re-requests
             self.swipes.update_one(
                 {"swiper": notification["from"], "target": notification["to"]},
                 {"$set": {"liked": False, "timestamp": datetime.utcnow()}},
@@ -172,7 +160,12 @@ class MatchService:
                 continue
             photo_url = self.build_photo_url(request, user.get("photo"))
             profiles.append({
-                "name": user.get("name"),
-                "images": [photo_url]
-            })
+            "name": user.get("name"),
+            "email": user.get("email"),  
+            "images": [photo_url],
+            # "location": detail.get("location"),
+            # "online": True  # Optional: add if you support real-time status
+        })
         return profiles
+
+        

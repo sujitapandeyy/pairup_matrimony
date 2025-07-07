@@ -8,9 +8,15 @@ type NavBarProps = {
   currentView: 'discover' | 'matches' | 'chat' | 'profile' | 'requests';
   setCurrentView: (view: NavBarProps['currentView']) => void;
   requestCount: number;
+  unreadMessageCount: number;
 };
 
-const NavBar = ({ currentView, setCurrentView, requestCount }: NavBarProps) => {
+const NavBar = ({
+  currentView,
+  setCurrentView,
+  requestCount,
+  unreadMessageCount,
+}: NavBarProps) => {
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
 
@@ -40,11 +46,6 @@ const NavBar = ({ currentView, setCurrentView, requestCount }: NavBarProps) => {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
             Pair-Up
           </h1>
-          {/* {userName && (
-            <span className="ml-4 font-semibold text-gray-700">
-              Hello, {userName}
-            </span>
-          )} */}
         </div>
 
         <nav className="flex items-center space-x-6">
@@ -61,10 +62,8 @@ const NavBar = ({ currentView, setCurrentView, requestCount }: NavBarProps) => {
           </button>
 
           <button
-            // onClick={() => router.push('/dashboard/chat')}
-
             onClick={() => setCurrentView('matches')}
-            className={`p-2 rounded-full transition-colors ${
+            className={`relative p-2 rounded-full transition-colors ${
               currentView === 'matches'
                 ? 'bg-rose-100 text-rose-600'
                 : 'text-gray-600 hover:text-rose-600'
@@ -72,6 +71,11 @@ const NavBar = ({ currentView, setCurrentView, requestCount }: NavBarProps) => {
             aria-label="Matches"
           >
             <MessageCircle className="w-6 h-6" />
+            {unreadMessageCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
+                {unreadMessageCount}
+              </span>
+            )}
           </button>
 
           <button
