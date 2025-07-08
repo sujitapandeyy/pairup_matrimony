@@ -2,13 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageCircle, Heart, User, X, Bell } from 'lucide-react';
+import { MessageCircle, Heart, User, X, Bell, Send } from 'lucide-react';
 
 type NavBarProps = {
-  currentView: 'discover' | 'matches' | 'chat' | 'profile' | 'requests';
+  currentView:
+    | 'discover'
+    | 'matches'
+    | 'chat'
+    | 'profile'
+    | 'requests'
+    | 'sent'; // added 'sent'
   setCurrentView: (view: NavBarProps['currentView']) => void;
   requestCount: number;
   unreadMessageCount: number;
+  sentRequestCount: number; // added count for sent requests
 };
 
 const NavBar = ({
@@ -16,6 +23,7 @@ const NavBar = ({
   setCurrentView,
   requestCount,
   unreadMessageCount,
+  sentRequestCount,
 }: NavBarProps) => {
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
@@ -92,6 +100,24 @@ const NavBar = ({
             {requestCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
                 {requestCount}
+              </span>
+            )}
+          </button>
+
+          {/* New Sent Requests Button */}
+          <button
+            onClick={() => setCurrentView('sent')}
+            className={`relative p-2 rounded-full transition-colors ${
+              currentView === 'sent'
+                ? 'bg-rose-100 text-rose-600'
+                : 'text-gray-600 hover:text-rose-600'
+            }`}
+            aria-label="Sent Requests"
+          >
+            <Send className="w-6 h-6" />
+            {sentRequestCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
+                {sentRequestCount}
               </span>
             )}
           </button>

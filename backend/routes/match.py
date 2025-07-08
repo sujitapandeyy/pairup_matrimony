@@ -71,3 +71,30 @@ def get_mutual_matches():
     service = MatchService(current_app.mongo.db)
     matches = service.get_mutual_matches(email, request)
     return jsonify({"logged_in_user": email, "matches": matches}), 200
+
+@match_bp.route('/sent_requests', methods=['GET'])
+def sent_requests():
+    email = request.args.get('email')
+    if not email:
+        return jsonify({"error": "Missing email"}), 400
+
+    service = MatchService(current_app.mongo.db)
+    sent = service.get_sent_requests(email, request)
+    return jsonify({"sentRequests": sent}), 200
+
+@match_bp.route("/sent_requests/cancel", methods=["POST"])
+def cancel_sent_request():
+    data = request.get_json()
+    swiper = data.get("swiper_email")
+    target = data.get("target_email")
+
+    if not swiper or not target:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    service = MatchService(current_app.mongo.db)
+    success = service.cancel_sent_request(swiper, target)
+    if success:
+        return jsonify({"message": "Request cancelled"}), 200
+    else:
+        return jsonify({"error": "Request not found"}), 404
+

@@ -17,6 +17,32 @@ class MatchService:
             return raw_photo
         return f"{base_url}/default-profile.jpg"
 
+    def get_sent_requests(self, email, request):
+        liked = self.swipes.find({"swiper": email, "liked": True})
+        liked_emails = [s["target"] for s in liked]
+
+        reverse_likes = self.swipes.find({"target": email, "liked": True})
+        reverse_emails = [s["swiper"] for s in reverse_likes]
+
+        pending_requests = set(liked_emails) - set(reverse_emails)
+
+        profiles = []
+        for user in self.users.find({"email": {"$in": list(pending_requests)}}):
+            detail = self.details.find_one({"user_id": user["_id"]})
+            if not detail:
+                continue
+            photo_url = self.build_photo_url(request, user.get("photo"))
+            profiles.append({
+                "id": str(user["_id"]),
+                "name": user.get("name"),
+                "email": user.get("email"),
+                "age": detail.get("age"),
+                "location": detail.get("location"),
+                "photos": [photo_url],
+            })
+
+        return profiles
+
     def get_profiles(self, request, current_email):
         liked_emails = {s["target"] for s in self.swipes.find({"swiper": current_email, "liked": True})}
         liked_by_emails = {s["swiper"] for s in self.swipes.find({"target": current_email, "liked": True})}
@@ -103,7 +129,6 @@ class MatchService:
         return {"match": False}
 
     def get_notifications(self, email, request):
-        # Get latest notifications (requests + matches) for a user
         notes = list(self.notifications.find({
             "to": email,
             "type": {"$in": ["request", "match"]}
@@ -149,7 +174,6 @@ class MatchService:
         return True
 
     def get_mutual_matches(self, email, request):
-        # Get all mutual matched profiles for the user
         matched_docs = self.matches.find({"users": email})
         matched_emails = [u for m in matched_docs for u in m["users"] if u != email]
 
@@ -160,12 +184,25 @@ class MatchService:
                 continue
             photo_url = self.build_photo_url(request, user.get("photo"))
             profiles.append({
-            "name": user.get("name"),
-            "email": user.get("email"),  
-            "images": [photo_url],
-            # "location": detail.get("location"),
-            # "online": True  # Optional: add if you support real-time status
-        })
+                "name": user.get("name"),
+                "email": user.get("email"),
+                "images": [photo_url],
+                # "location": detail.get("location"),
+                # "online": True  # Optional: add if you support real-time status
+            })
         return profiles
 
-        
+    def cancel_sent_request(self, swiper_email, target_email):
+        swipe_result = self.swipes.delete_one({
+            "swiper": swiper_email,
+            "target": target_email,
+            "liked": True
+        })
+
+        self.notifications.delete_many({
+            "from": swiper_email,
+            "to": target_email,
+            "type": "request"
+        })
+
+        return swipe_result.deleted_count > 0

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Heart, X, MapPin, Briefcase, GraduationCap } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const ProfileCards = () => {
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -23,7 +24,7 @@ const ProfileCards = () => {
         if (parsed?._id) setUserId(parsed._id);
         if (parsed?.name) setUserName(parsed.name);
       } catch (err) {
-        console.error('Error parsing user from localStorage');
+        toast.error('Error parsing user from localStorage');
       }
     }
   }, []);
@@ -44,33 +45,42 @@ const ProfileCards = () => {
   }, [email]);
 
   const handleSwipe = async (liked: boolean) => {
-    const targetProfile = profiles[currentIndex];
+  const targetProfile = profiles[currentIndex];
 
-    try {
-      await fetch('http://localhost:5050/matches/swipe', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          swiper_email: email,
-          target_email: targetProfile.email,
-          liked,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to store swipe:', error);
+  try {
+    const res = await fetch('http://localhost:5050/matches/swipe', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        swiper_email: email,
+        target_email: targetProfile.email,
+        liked,
+      }),
+    });
+
+    if (!res.ok) {
+      toast.error('Failed to send request');
+    } else {
+      if (liked) {
+        toast.success('Interest Request sent!');
+      }
     }
+  } catch (error) {
+    toast.error('Failed to store swipe');
+  }
 
-    if (liked && Math.random() > 0.5) {
-      setMatchedProfile(targetProfile);
-      setShowMatch(true);
-    }
+  if (liked && Math.random() > 0.5) {
+    setMatchedProfile(targetProfile);
+    setShowMatch(true);
+  }
 
-    setProfiles((prev) => prev.filter((_, idx) => idx !== currentIndex));
-    setCurrentIndex((prev) => (prev >= profiles.length - 1 ? 0 : prev));
-  };
+  setProfiles((prev) => prev.filter((_, idx) => idx !== currentIndex));
+  setCurrentIndex((prev) => (prev >= profiles.length - 1 ? 0 : prev));
+};
+
 
   if (!email) return <div className="text-center py-10">Loading user...</div>;
   if (profiles.length === 0) return <div className="text-center py-10">No profiles found.</div>;

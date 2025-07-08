@@ -7,7 +7,8 @@ import ProfileCards from './ProfileCards';
 import ProfilePage from '@/components/ProfilePage';
 import Requests from '@/components/Request';
 import ChatInterface from '../../components/ChatInterface';
-import { toast, Toaster } from 'sonner';
+import SentRequests from '@/components/SentRequests';
+import { toast } from 'sonner';
 
 interface Match {
   name: string;
@@ -18,18 +19,37 @@ interface Match {
   lastSender?: string;
 }
 
+interface Profile {
+  id: string;
+  name: string;
+  age: number;
+  location: string;
+  photos: string[];
+  email: string;
+}
+
 const Page = () => {
   const router = useRouter();
 
-  const [currentView, setCurrentView] = useState<'discover' | 'matches' | 'chat' | 'profile' | 'requests'>('discover');
+  const [currentView, setCurrentView] = useState<
+    | 'discover'
+    | 'matches'
+    | 'chat'
+    | 'profile'
+    | 'requests'
+    | 'sent'
+  >('discover');
   const [selectedChat, setSelectedChat] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+
   const [requests, setRequests] = useState<any[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [lastReadTimestamps, setLastReadTimestamps] = useState<Record<string, string>>({});
   const [liveUnreadCount, setLiveUnreadCount] = useState(0);
+
+  const [sentRequests, setSentRequests] = useState<Profile[]>([]);
 
   // Load currentView from localStorage
   useEffect(() => {
@@ -95,7 +115,6 @@ const Page = () => {
 
         const matchesWithMeta: Match[] = await Promise.all(
           data.matches.map(async (match: Match) => {
-            // Fetch last message between user and match
             const chatRes = await fetch(
               `http://localhost:5050/chat/history?user1=${encodeURIComponent(userEmail ?? '')}&user2=${encodeURIComponent(match.email)}`
             );
@@ -120,6 +139,21 @@ const Page = () => {
     fetchMatches();
   }, [userEmail]);
 
+  // Fetch sent requests
+  useEffect(() => {
+    if (!userEmail) return;
+
+    fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(userEmail)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setSentRequests(data.sentRequests || []);
+      })
+      .catch((err) => {
+        console.error('Failed to load sent requests', err);
+        toast.error('Failed to load sent requests');
+      });
+  }, [userEmail]);
+
   // Update lastReadTimestamps when user selects a chat
   useEffect(() => {
     if (selectedChat && selectedChat.lastTimestamp) {
@@ -135,7 +169,7 @@ const Page = () => {
     const count = matches.reduce((acc, match) => {
       if (
         match.lastMessage &&
-        match.lastSender !== userEmail && // message is from other user
+        match.lastSender !== userEmail &&
         (!lastReadTimestamps[match.email] ||
           new Date(match.lastTimestamp || '').getTime() > new Date(lastReadTimestamps[match.email] || '').getTime())
       ) {
@@ -156,12 +190,13 @@ const Page = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50">
-      <Toaster position="top-center" richColors />
+      {/* <Toaster position="top-center" richColors /> */}
       <NavBar
         currentView={currentView}
         setCurrentView={setCurrentView}
         requestCount={requests.length}
         unreadMessageCount={liveUnreadCount}
+        sentRequestCount={sentRequests.length}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
         {currentView === 'discover' && <ProfileCards />}
@@ -169,7 +204,7 @@ const Page = () => {
           <ChatInterface
             onSelectChat={setSelectedChat}
             selectedChat={selectedChat}
-            onUnreadCountChange={setLiveUnreadCount} // Pass handler for live update
+            onUnreadCountChange={setLiveUnreadCount}
           />
         )}
         {currentView === 'profile' && <ProfilePage userId={userId} />}
@@ -178,6 +213,14 @@ const Page = () => {
             requests={requests}
             setRequests={setRequests}
             setCurrentView={setCurrentView}
+          />
+        )}
+        {currentView === 'sent' && (
+          <SentRequests
+            sentRequests={sentRequests}
+            onCancel={(email) => {
+              setSentRequests((prev) => prev.filter((p) => p.email !== email));
+            }}
           />
         )}
       </main>
