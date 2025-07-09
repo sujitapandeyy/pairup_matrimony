@@ -5,7 +5,8 @@ import { Send, XCircle } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-
+import { useRouter } from 'next/navigation';
+import api from '@/lib/api'
 interface Profile {
   id: string;
   name: string;
@@ -16,6 +17,8 @@ interface Profile {
 }
 
 const SentRequests = () => {
+    const router = useRouter();
+  
   const [sentRequests, setSentRequests] = useState<Profile[] | null>(null); // null = loading
   const [error, setError] = useState<string | null>(null);
 
@@ -24,17 +27,18 @@ const SentRequests = () => {
       try {
         const userStr = localStorage.getItem('pairupUser');
         if (!userStr) {
-          setError('User not logged in');
-          setSentRequests([]);
+        toast.error('Please log in');
+        router.push('/login');
+              // setSentRequests([]);
           return;
         }
 
         const user = JSON.parse(userStr);
-        const res = await fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(user.email)}`);
-        const data = await res.json();
+                // const response = await api.get('/api/users')
+        const res = await api.get(`matches/sent_requests?email=${encodeURIComponent(user.email)}`);
 
-        if (res.ok && Array.isArray(data.sentRequests)) {
-          setSentRequests(data.sentRequests);
+        if (res.status === 200 && Array.isArray(res.data.sentRequests)) {
+          setSentRequests(res.data.sentRequests);
         } else {
           setSentRequests([]);
           setError(null);
@@ -57,19 +61,20 @@ const SentRequests = () => {
         return;
       }
       const user = JSON.parse(userStr);
+// const res = await api.get(`matches/sent_requests?email=${encodeURIComponent(user.email)}`);
 
-      const res = await fetch(`http://localhost:5050/matches/sent_requests/cancel`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ swiper_email: user.email, target_email: email }),
+//         if (res.status === 200 && Array.isArray(res.data.sentRequests)) {
+          // setSentRequests(res.data.sentRequests);
+      const res = await api.post(`matches/sent_requests/cancel`, {
+        swiper_email: user.email,
+        target_email: email,
       });
 
-      const data = await res.json();
-      if (res.ok) {
+      if (res.status === 200) {
         toast.success('Request cancelled');
         setSentRequests((prev) => prev?.filter((p) => p.email !== email) || []);
       } else {
-        toast.error(data.error || 'Cancel failed');
+        toast.error(res.data?.error || 'Cancel failed');
       }
     } catch (err) {
       console.error(err);

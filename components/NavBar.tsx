@@ -2,13 +2,25 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { MessageCircle, Heart, User, X, Bell, Send } from 'lucide-react';
+import {
+  MessageCircle,
+  Heart,
+  User,
+  X,
+  Bell,
+  Send,
+  LayoutDashboard,
+  List,
+  Eraser,
+  Info,
+} from 'lucide-react';
 
 const NavBar = () => {
   const router = useRouter();
   const pathname = usePathname();
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [role, setUserRole] = useState<string | null>(null);
   const [requestCount, setRequestCount] = useState(0);
   const [sentRequestCount, setSentRequestCount] = useState(0);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
@@ -21,13 +33,13 @@ const NavBar = () => {
       try {
         const user = JSON.parse(storedUser);
         if (user.email) setUserEmail(user.email);
-      } catch {
-      }
+        if (user.role) setUserRole(user.role);
+      } catch {}
     }
   }, []);
 
   useEffect(() => {
-    if (!userEmail) return;
+    if (!userEmail || role === 'admin') return;
 
     const fetchCounts = () => {
       fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
@@ -40,7 +52,6 @@ const NavBar = () => {
         })
         .catch(() => setRequestCount(0));
 
-     
       fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(userEmail)}`)
         .then(res => res.json())
         .then(data => {
@@ -48,23 +59,18 @@ const NavBar = () => {
           setSentRequestCount(count);
         })
         .catch(() => setSentRequestCount(0));
-
-      // Fetch unread chat count
-      // fetch(`http://localhost:5050/chat/unread_count?email=${encodeURIComponent(userEmail)}`)
-      //   .then(res => res.json())
-      //   .then(data => {
-      //     setUnreadChatCount(data.unreadCount || 0);
-      //   })
-      //   .catch(() => setUnreadChatCount(0));
     };
 
     fetchCounts();
     const interval = setInterval(fetchCounts, 10000);
     return () => clearInterval(interval);
-  }, [userEmail]);
+  }, [userEmail, role]);
 
   const currentView = (() => {
-    if (pathname === '/' || pathname === '/dashboard') return 'dashboard';
+    if (pathname === '/' || pathname === '/user_dashboard') return 'dashboard';
+    if (pathname.startsWith('/admin/dashboard')) return 'admin-dashboard';
+    if (pathname.startsWith('/admin/user')) return 'admin-user';
+    if (pathname.startsWith('/admin/reports')) return 'admin-reports';
     if (pathname.startsWith('/chat')) return 'chat';
     if (pathname.startsWith('/requests')) return 'requests';
     if (pathname.startsWith('/sent')) return 'sent';
@@ -77,9 +83,10 @@ const NavBar = () => {
   return (
     <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-pink-100">
       <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+        {/* Logo click navigates to correct dashboard */}
         <button
           type="button"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(role === 'admin' ? '/admin/dashboard' : '/user_dashboard')}
           className="flex items-center space-x-3 cursor-pointer"
           aria-label="Go to Dashboard"
         >
@@ -92,47 +99,80 @@ const NavBar = () => {
         </button>
 
         <nav className="flex items-center space-x-6">
-          <IconButton
-            icon={<Heart className="w-6 h-6" />}
-            label="Dashboard"
-            active={currentView === 'dashboard'}
-            onClick={() => navigate('/dashboard')}
-          />
-          <IconButton
-            icon={<MessageCircle className="w-6 h-6" />}
-            label="Chat"
-            active={currentView === 'chat'}
-            onClick={() => navigate('/chat')}
-            badge={isMounted ? unreadChatCount : undefined}
-          />
-          <IconButton
-            icon={<Bell className="w-6 h-6" />}
-            label="Requests"
-            active={currentView === 'requests'}
-            onClick={() => navigate('/requests')}
-            badge={isMounted ? requestCount : undefined}
-          />
-          <IconButton
-            icon={<Send className="w-6 h-6" />}
-            label="Sent Requests"
-            active={currentView === 'sent'}
-            onClick={() => navigate('/sent')}
-            badge={isMounted ? sentRequestCount : undefined}
-          />
-          <IconButton
-            icon={<User className="w-6 h-6" />}
-            label="Profile"
-            active={currentView === 'profile'}
-            onClick={() => navigate('/profile')}
-          />
-          <IconButton
-            icon={<X className="w-6 h-6" />}
-            label="Logout"
-            onClick={() => {
-              localStorage.removeItem('pairupUser');
-              router.push('/login');
-            }}
-          />
+          {role === 'admin' ? (
+            <>
+              <IconButton
+                icon={<LayoutDashboard className="w-6 h-6" />}
+                label="Admin Dashboard"
+                active={currentView === 'admin-dashboard'}
+                onClick={() => navigate('/admin/dashboard')}
+              />
+              <IconButton
+                icon={<User className="w-6 h-6" />}
+                label="Users"
+                active={currentView === 'admin-user'}
+                onClick={() => navigate('/admin/users')}
+              />
+              <IconButton
+                icon={<Info className="w-6 h-6" />}
+                label="reports"
+                active={currentView === 'admin-reports'}
+                onClick={() => navigate('/admin/reports')}
+              />
+              <IconButton
+                icon={<X className="w-6 h-6" />}
+                label="Logout"
+                onClick={() => {
+                  localStorage.removeItem('pairupUser');
+                  router.push('/login');
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <IconButton
+                icon={<Heart className="w-6 h-6" />}
+                label="Dashboard"
+                active={currentView === 'dashboard'}
+                onClick={() => navigate('/user_dashboard')}
+              />
+              <IconButton
+                icon={<MessageCircle className="w-6 h-6" />}
+                label="Chat"
+                active={currentView === 'chat'}
+                onClick={() => navigate('/chat')}
+                badge={isMounted ? unreadChatCount : undefined}
+              />
+              <IconButton
+                icon={<Bell className="w-6 h-6" />}
+                label="Requests"
+                active={currentView === 'requests'}
+                onClick={() => navigate('/requests')}
+                badge={isMounted ? requestCount : undefined}
+              />
+              <IconButton
+                icon={<Send className="w-6 h-6" />}
+                label="Sent Requests"
+                active={currentView === 'sent'}
+                onClick={() => navigate('/sent')}
+                badge={isMounted ? sentRequestCount : undefined}
+              />
+              <IconButton
+                icon={<User className="w-6 h-6" />}
+                label="Profile"
+                active={currentView === 'profile'}
+                onClick={() => navigate('/profile')}
+              />
+              <IconButton
+                icon={<X className="w-6 h-6" />}
+                label="Logout"
+                onClick={() => {
+                  localStorage.removeItem('pairupUser');
+                  router.push('/login');
+                }}
+              />
+            </>
+          )}
         </nav>
       </div>
     </header>

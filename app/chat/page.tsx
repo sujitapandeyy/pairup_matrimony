@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import ChatInterface from '@/components/ChatInterface';
-import NavBar from '@/components/NavBar';
+// import NavBar from '@/components/NavBar';
 
 interface Match {
   name: string;

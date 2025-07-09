@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Send, Heart } from 'lucide-react';
 import io from 'socket.io-client';
+import { toast } from 'sonner'
+import { SOCKET_SERVER } from '@/lib/api';
 
 interface Match {
   name: string;
@@ -29,7 +31,7 @@ interface ChatInterfaceProps {
   onUnreadCountChange: (count: number) => void;
 }
 
-const SOCKET_SERVER_URL = 'http://localhost:5050';
+// const SOCKET_SERVER = 'http://localhost:5050';
 
 const normalizeTimestamp = (ts?: string) => {
   if (!ts) return '';
@@ -66,7 +68,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
 
   const fetchReadReceipt = async (user: string, chatWith: string) => {
     try {
-      const res = await fetch(`${SOCKET_SERVER_URL}/chat/read_receipt?user=${user}&chat_with=${chatWith}`);
+      const res = await fetch(`${SOCKET_SERVER}/chat/read_receipt?user=${user}&chat_with=${chatWith}`);
       const data = await res.json();
       return data?.last_read || null;
     } catch {
@@ -77,7 +79,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   const fetchChatHistory = async (user1: string, user2: string): Promise<Message[]> => {
     try {
       const res = await fetch(
-        `${SOCKET_SERVER_URL}/chat/history?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`
+        `${SOCKET_SERVER}/chat/history?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`
       );
       const data = await res.json();
       return (data.messages || []).map((msg: Message) => ({
@@ -85,7 +87,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
         timestamp: normalizeTimestamp(msg.timestamp),
       }));
     } catch (err) {
-      console.error('Failed to load chat history:', err);
+      toast.error('Failed to load chat history:');
       return [];
     }
   };
@@ -93,7 +95,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   const fetchMatches = useCallback(async () => {
     if (!loggedInEmail) return;
     try {
-      const res = await fetch(`${SOCKET_SERVER_URL}/matches/get_mutual_matches?email=${encodeURIComponent(loggedInEmail)}`);
+      const res = await fetch(`${SOCKET_SERVER}/matches/get_mutual_matches?email=${encodeURIComponent(loggedInEmail)}`);
       const data = await res.json();
       const rawMatches = data.matches || [];
 
@@ -131,7 +133,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
 
       onUnreadCountChange(unreadCount);
     } catch (err) {
-      console.error('Failed to load matches:', err);
+      toast.error('Failed to load matches:');
     }
   }, [loggedInEmail, onUnreadCountChange]);
 
@@ -148,7 +150,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   useEffect(() => {
     if (!loggedInEmail) return;
 
-    const socket = io(SOCKET_SERVER_URL, { query: { email: loggedInEmail } });
+    const socket = io(SOCKET_SERVER, { query: { email: loggedInEmail } });
     socketRef.current = socket;
 
     socket.on('online_users', (onlineEmails: string[]) => {
@@ -220,7 +222,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
     if (selectedChat?.email && loggedInEmail && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg?.timestamp) {
-        fetch(`${SOCKET_SERVER_URL}/chat/read_receipt`, {
+        fetch(`${SOCKET_SERVER}/chat/read_receipt`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

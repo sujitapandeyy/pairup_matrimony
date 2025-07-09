@@ -22,6 +22,8 @@ from routes.interest import interest_bp
 from routes.profile import profile_bp
 from routes.match import match_bp
 from routes.chat import chat_bp
+from routes.user_routes import user_bp
+from routes.user_routes import user_bp  
 
 app.register_blueprint(register_bp, url_prefix='/auth')
 app.register_blueprint(login_bp, url_prefix='/auth')
@@ -29,6 +31,7 @@ app.register_blueprint(interest_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(match_bp, url_prefix='/matches')
 app.register_blueprint(chat_bp, url_prefix='/chat')
+app.register_blueprint(user_bp)
 
 if __name__ == '__main__':
     socketio.init_app(app)

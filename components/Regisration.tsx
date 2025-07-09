@@ -41,7 +41,7 @@ const [detailsData, setDetailsData] = useState({
 
   useEffect(() => {
     const storedUser = localStorage.getItem('pairupUser')
-    if (storedUser) router.push('/dashboard')
+    if (storedUser) router.push('/user_dashboard')
   }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

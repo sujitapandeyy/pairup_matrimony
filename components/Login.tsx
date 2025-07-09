@@ -10,7 +10,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
 
   const router = useRouter()
-  // const { toast } = useToast()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -30,30 +29,30 @@ export default function Login() {
       const data = await res.json()
 
       if (res.ok && data.success) {
-        const { id, name, email, interests_completed } = data.user
+        const { id, name, email, interests_completed, role } = data.user
 
         const completed = interests_completed === true || interests_completed === 'true'
 
         localStorage.setItem(
           'pairupUser',
-          JSON.stringify({ id, email, name, interests_completed: completed })
+          JSON.stringify({ id, email, name, interests_completed: completed, role })
         )
 
-       toast.success('Login successful!')
+        toast.success('Login successful!')
 
-
-        if (completed) {
-          router.push('/dashboard')
+        // Redirect based on role
+        if (role === 'admin') {
+          router.push('/admin/dashboard')
+        } else if (completed) {
+          router.push('/user_dashboard')
         } else {
           router.push('/interests')
         }
       } else {
-       toast.error('Login failed. Please try again.')
-
+        toast.error('Login failed. Please try again.')
       }
     } catch (err) {
-     toast.error('Server error.')
-
+      toast.error('Server error.')
     } finally {
       setLoading(false)
     }

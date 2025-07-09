@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Geist, Geist_Mono } from "next/font/google";
+import { usePathname } from "next/navigation";
 import "./globals.css";
 import { Toaster } from "sonner";
 import NavBar from "@/components/NavBar";
@@ -21,10 +22,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
+  // Hide navbar on /login and /register
+  const hideNavBar = ["/login", "/register", '/interest'].includes(pathname);
+  // const hideNavBar = [""].includes(pathname);
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NavBar />
+        {!hideNavBar && <NavBar />}
         {children}
         <Toaster richColors position="bottom-right" duration={2000} />
       </body>

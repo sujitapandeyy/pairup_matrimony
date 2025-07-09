@@ -1,143 +1,129 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Heart, X, MessageCircle, MapPin, Briefcase, GraduationCap } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Heart, X, MessageCircle, MapPin, Briefcase, GraduationCap } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import api from '@/lib/api'
 
-const backendUrl = "http://localhost:5050";
-const DEFAULT_AVATAR = '/defaultboy.jpg';
+// const DEFAULT_AVATAR = '/defaultboy.jpg'
 
 function getFullImageUrl(imagePath: string | null | undefined) {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("/uploads/")) {
-    return backendUrl + imagePath;
+  if (!imagePath) return null
+  if (imagePath.startsWith('/uploads/')) {
+    return `${process.env.NEXT_PUBLIC_BACKEND_URL}${imagePath}`
   }
-  return imagePath;
+  return imagePath
 }
 
 const Requests = () => {
-  const router = useRouter();
+  const router = useRouter()
 
-  const [requests, setRequests] = useState<any[]>([]);
-  const [currentRequestIndex, setCurrentRequestIndex] = useState(0);
-  const [showMatch, setShowMatch] = useState(false);
-  const [matchedProfile, setMatchedProfile] = useState<any>(null);
-  const [email, setEmail] = useState<string | null>(null);
-  const [userImage, setUserImage] = useState<string>(DEFAULT_AVATAR);
-  const [requestToRemoveAfterMatch, setRequestToRemoveAfterMatch] = useState<string | null>(null);
+  const [requests, setRequests] = useState<any[]>([])
+  const [currentRequestIndex, setCurrentRequestIndex] = useState(0)
+  const [showMatch, setShowMatch] = useState(false)
+  const [matchedProfile, setMatchedProfile] = useState<any>(null)
+  const [email, setEmail] = useState<string | null>(null)
+  const [userImage, setUserImage] = useState<string|null>(null)
+  const [requestToRemoveAfterMatch, setRequestToRemoveAfterMatch] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('pairupUser');
+    const storedUser = localStorage.getItem('pairupUser')
     if (storedUser) {
       try {
-        const parsed = JSON.parse(storedUser);
-        setEmail(parsed.email?.toLowerCase() || null);
-        const fullImage = getFullImageUrl(parsed.image);
-        setUserImage(fullImage || DEFAULT_AVATAR);
+        const parsed = JSON.parse(storedUser)
+        setEmail(parsed.email?.toLowerCase() || null)
+        const fullImage = getFullImageUrl(parsed.image)
+        setUserImage(fullImage || null)
       } catch (error) {
-        console.error('Failed to parse user:', error);
-        toast.error('Failed to load user info');
+        console.error('Failed to parse user:', error)
+        toast.error('Failed to load user info')
       }
     } else {
-      toast.error('Please log in');
-      router.push('/login');
+      toast.error('Please log in')
+      router.push('/login')
     }
-  }, [router]);
+  }, [router])
 
-  // Fetch requests after email is set
   useEffect(() => {
-    if (!email) return;
+    if (!email) return
 
-    fetch(`${backendUrl}/matches/notifications?email=${encodeURIComponent(email)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const filtered = data.filter((n: any) =>
-          n.type === 'request' &&
-          n.to?.toLowerCase() === email
-        );
-        setRequests(filtered || []);
-        setCurrentRequestIndex(0);
-      })
-      .catch((err) => {
-        console.error('Failed to load notifications', err);
-        toast.error('Failed to load match requests');
-      });
-  }, [email]);
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get(`/matches/notifications`, {
+          params: { email }
+        })
+        const filtered = res.data.filter((n: any) => n.type === 'request' && n.to?.toLowerCase() === email)
+        setRequests(filtered || [])
+        setCurrentRequestIndex(0)
+      } catch (err) {
+        console.error('Failed to load notifications', err)
+        toast.error('Failed to load match requests')
+      }
+    }
+
+    fetchNotifications()
+  }, [email])
 
   const handleLikeBack = async (senderEmail: string) => {
-    const targetRequest = requests[currentRequestIndex];
+    const targetRequest = requests[currentRequestIndex]
     try {
-      const res = await fetch(`${backendUrl}/matches/swipe`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          swiper_email: email,
-          target_email: senderEmail,
-          liked: true,
-        }),
-      });
+      const res = await api.post(`/matches/swipe`, {
+        swiper_email: email,
+        target_email: senderEmail,
+        liked: true
+      })
 
-      if (res.ok) {
-        const matchData = await res.json();
-        if (matchData.match) {
-          setMatchedProfile({
-            name: targetRequest.sender_name,
-            images: [getFullImageUrl(targetRequest.sender_image)],
-            userImage: userImage,
-          });
-          setShowMatch(true);
-          setRequestToRemoveAfterMatch(targetRequest._id);
-        } else {
-          const updated = requests.filter(r => r._id !== targetRequest._id);
-          setRequests(updated);
-          setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1));
-        }
+      if (res.data.match) {
+        setMatchedProfile({
+          name: targetRequest.sender_name,
+          images: [getFullImageUrl(targetRequest.sender_image)],
+          userImage: userImage
+        })
+        setShowMatch(true)
+        setRequestToRemoveAfterMatch(targetRequest._id)
       } else {
-        toast.error('Failed to like back: Server error');
+        const updated = requests.filter(r => r._id !== targetRequest._id)
+        setRequests(updated)
+        setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1))
       }
     } catch (error) {
-      console.error('Failed to like back:', error);
-      toast.error('Failed to like back');
+      console.error('Failed to like back:', error)
+      toast.error('Failed to like back')
     }
-  };
+  }
 
   const handleIgnore = async (notificationId: string) => {
     try {
-      await fetch(`${backendUrl}/matches/ignore/${notificationId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const updated = requests.filter(r => r._id !== notificationId);
-      setRequests(updated);
-      setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1));
-      toast.success('Request ignored');
+      await api.delete(`/matches/ignore/${notificationId}`)
+      const updated = requests.filter(r => r._id !== notificationId)
+      setRequests(updated)
+      setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1))
+      toast.success('Request ignored')
     } catch (error) {
-      console.error('Failed to ignore request:', error);
-      toast.error('Failed to ignore request');
+      console.error('Failed to ignore request:', error)
+      toast.error('Failed to ignore request')
     }
-  };
+  }
 
   const closeMatchModal = () => {
-    setShowMatch(false);
-    setMatchedProfile(null);
+    setShowMatch(false)
+    setMatchedProfile(null)
     if (requestToRemoveAfterMatch) {
-      const updated = requests.filter(r => r._id !== requestToRemoveAfterMatch);
-      setRequests(updated);
-      setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1));
-      setRequestToRemoveAfterMatch(null);
+      const updated = requests.filter(r => r._id !== requestToRemoveAfterMatch)
+      setRequests(updated)
+      setCurrentRequestIndex(prev => Math.min(prev, updated.length - 1))
+      setRequestToRemoveAfterMatch(null)
     }
-  };
+  }
 
-  if (!email) return <div className="text-center py-10">Loading user...</div>;
-  if (requests.length === 0) return <div className="text-center py-10">No requests at the moment.</div>;
+  if (!email) return <div className="text-center py-10">Loading user...</div>
+  if (requests.length === 0) return <div className="text-center py-10">No requests at the moment.</div>
 
-  const currentRequest = requests[currentRequestIndex];
-  const senderImage = getFullImageUrl(currentRequest.sender_image) || DEFAULT_AVATAR;
-
+  const currentRequest = requests[currentRequestIndex]
+  const senderImage = getFullImageUrl(currentRequest.sender_image) || null
   return (
     <div className="flex justify-center">
       <div className="w-full max-w-sm">

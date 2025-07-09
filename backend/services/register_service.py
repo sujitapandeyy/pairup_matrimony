@@ -11,13 +11,39 @@ class RegisterService:
         name = data.get('name')
         email = data.get('email')
         password = data.get('password')
+        status = data.get('status', 'active')
+        role = data.get('role', 'user')  # ✅ default to user
         details = data.get('details')
 
-        if not all([name, email, password, details]):
+        if not all([name, email, password, status]):
             return {'success': False, 'message': 'Missing required fields'}, 400
 
         if self.user_model.get_by_email(email):
             return {'success': False, 'message': 'Email already registered'}, 409
+
+        # Common user document
+        hashed_password = generate_password_hash(password)
+        user_doc = {
+            'name': name,
+            'email': email,
+            'status': status,
+            'password': hashed_password,
+            'role': role,
+            'photo': '/img/defaultboy.jpg',  # fallback default
+        }
+
+        # Admins don’t need details or interests
+        if role == 'admin':
+            try:
+                result = self.user_model.create_user(user_doc)
+                return {'success': True, 'message': 'Admin registration successful'}, 200
+            except Exception as e:
+                print(f"Admin registration error: {e}")
+                return {'success': False, 'message': 'Server error'}, 500
+
+        # Validate user details (for normal users)
+        if not details:
+            return {'success': False, 'message': 'User details are required'}, 400
 
         try:
             age = int(details.get('age'))
@@ -39,21 +65,10 @@ class RegisterService:
         if any(not field for field in required_fields):
             return {'success': False, 'message': 'Missing required personal details'}, 400
 
-        # default profile image based on gender
+        # Profile image based on gender
         gender = details.get('gender')
-        if gender == 'Female':
-            profile_image_url = '/img/defaultgirl.jpg'
-        else:
-            profile_image_url = '/img/defaultboy.jpg'
-
-        hashed_password = generate_password_hash(password)
-        user_doc = {
-            'name': name,
-            'email': email,
-            'password': hashed_password,
-            'photo': profile_image_url, 
-            'interests_completed': False,
-        }
+        user_doc['photo'] = '/img/defaultgirl.jpg' if gender == 'Female' else '/img/defaultboy.jpg'
+        user_doc['interests_completed'] = False  # ✅ only for normal users
 
         try:
             user_result = self.user_model.create_user(user_doc)
@@ -77,8 +92,8 @@ class RegisterService:
 
             self.detail_model.create_details(details_doc)
 
-            return {'success': True, 'message': 'Registration successful'}, 200
+            return {'success': True, 'message': 'User registration successful'}, 200
 
         except Exception as e:
-            print(f"Error during registration: {e}")
+            print(f"User registration error: {e}")
             return {'success': False, 'message': 'Server error'}, 500

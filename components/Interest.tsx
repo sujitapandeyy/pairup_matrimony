@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Heart, User, Star, Home } from 'lucide-react';
 import { Progress } from './ui/progress';
-
+import api from '@/lib/api'
 import { Button } from '@/components/ui/button';
 
 const defaultForm = {
@@ -97,7 +97,7 @@ export default function Interests() {
         );
         toast.success('Preferences saved!');
         setMessage('Saved! Redirecting...');
-        setTimeout(() => router.push('/dashboard'), 1200);
+        setTimeout(() => router.push('/user_dashboard'), 1200);
       } else {
         toast.error(result.message || 'Failed to save.');
       }

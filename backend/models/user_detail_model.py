@@ -1,4 +1,3 @@
-# models/user_detail_model.py
 
 class UserDetailModel:
     def __init__(self, db):

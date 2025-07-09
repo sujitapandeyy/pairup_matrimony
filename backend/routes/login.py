@@ -7,6 +7,7 @@ login_bp = Blueprint('login', __name__)
 def login_user():
     db = current_app.mongo.db
     data = request.get_json()
+
     email = data.get("email")
     password = data.get("password")
 

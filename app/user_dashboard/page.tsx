@@ -18,6 +18,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const userStr = localStorage.getItem('pairupUser');
+    console.log('Dashboard localStorage user:', userStr);
     if (!userStr) {
       toast.error('Please log in');
       router.push('/login');
@@ -25,23 +26,33 @@ export default function DashboardPage() {
     }
     try {
       const user = JSON.parse(userStr);
-      const isCompleted = user.interests_completed === true || user.interests_completed === 'true';
+      console.log('Parsed user:', user);
+
+      const isCompleted =
+        user.interests_completed === true || user.interests_completed === 'true';
       if (!isCompleted) {
         toast.warning('Complete your profile to continue');
         router.push('/interests');
         return;
       }
-      setUserId(user._id || user.id || null);
+
+      // Use user.id (not user._id)
+      setUserId(user.id || null);
       setUserEmail(user.email || null);
       setLoading(false);
-    } catch {
+    } catch (e) {
       toast.error('Failed to parse user');
+      console.error('Error parsing user from localStorage:', e);
     }
   }, [router]);
 
   useEffect(() => {
     if (!userEmail) return;
-    fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
+    fetch(
+      `http://localhost:5050/matches/notifications?email=${encodeURIComponent(
+        userEmail
+      )}`
+    )
       .then((res) => res.json())
       .then((data) => {
         const requestNotifications = data.filter((n: any) => n.type === 'request');
@@ -52,7 +63,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!userEmail) return;
-    fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(userEmail)}`)
+    fetch(
+      `http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(
+        userEmail
+      )}`
+    )
       .then((res) => res.json())
       .then((data) => {
         setSentRequests(data.sentRequests || []);

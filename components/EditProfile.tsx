@@ -3,6 +3,8 @@
 import React, { ChangeEvent } from "react";
 import { Heart, Camera, Check, X, Briefcase, GraduationCap, Users } from "lucide-react";
 import { Profile } from "./types";
+import api from '@/lib/api'
+import { toast } from 'sonner'
 
 interface EditProfileProps {
   profile: Profile;

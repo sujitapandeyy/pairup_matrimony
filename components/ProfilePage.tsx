@@ -6,15 +6,13 @@ import ProfileView from "./ProfileView";
 import EditProfile from "./EditProfile";
 import { Profile, ProfilePageProps } from "./types";
 import { toast } from "sonner";
-
-const backendUrl = "http://localhost:5050";
-
-// const ageGroupOptions = ["18-25", "26-35", "36-45", "46+"];
+import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 function getFullImageUrl(photoPath?: string | null) {
-  if (!photoPath) return "/default-profile.png";
+  if (!photoPath) return null;
   if (photoPath.startsWith("/uploads/")) {
-    return `${backendUrl}${photoPath}?t=${Date.now()}`;
+    return `${process.env.NEXT_PUBLIC_BACKEND_URL}${photoPath}?t=${Date.now()}`;
   }
   return photoPath;
 }
@@ -28,6 +26,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (!userId) {
@@ -38,19 +37,13 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
     async function fetchProfile() {
       try {
-        const res = await fetch(`${backendUrl}/api/user/profile/${userId}`, {
-          credentials: 'include'
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to fetch profile");
-        }
-        const data: Profile = await res.json();
+        const res = await api.get(`/api/user/profile/${userId}`);
+        const data: Profile = res.data;
         setProfile(data);
         setFormData(data);
         setPhotoPreview(getFullImageUrl(data.photo));
       } catch (err: any) {
-        toast.error(err.message || "Failed to load profile");
+        toast.error(err.response?.data?.error || "Failed to load profile");
       } finally {
         setLoading(false);
       }
@@ -70,7 +63,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
 
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('File size should be less than 5MB');
       return;
@@ -87,24 +80,14 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     formDataFile.append("photo", file);
 
     try {
-      const res = await fetch(`${backendUrl}/api/user/profile/${userId}/upload-photo`, {
-        method: "POST",
-        body: formDataFile,
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "Photo upload failed");
-      }
-
-      const data = await res.json();
+      const res = await api.post(`/api/user/profile/${userId}/upload-photo`, formDataFile);
+      const data = res.data;
       const updatedUrl = getFullImageUrl(data.photoUrl);
       setFormData((prev) => ({ ...prev, photo: data.photoUrl }));
       setProfile((prev) => prev ? { ...prev, photo: data.photoUrl } : null);
       setPhotoPreview(updatedUrl);
     } catch (err: any) {
-      toast.error('Photo upload error:', err);
+      toast.error(err.response?.data?.error || "Failed to upload photo");
       setUploadError(err.message || "Failed to upload photo");
       setPhotoPreview(profile?.photo ? getFullImageUrl(profile.photo) : null);
     } finally {
@@ -131,29 +114,17 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`${backendUrl}/api/user/profile/${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "Failed to update profile");
-      }else{
-        toast.success("Profile updated successfully");
-      }
-
-      const updatedProfile = await res.json();
+      const res = await api.put(`/api/user/profile/${userId}`, formData);
+      toast.success("Profile updated successfully");
+      const updatedProfile = res.data;
       setProfile(updatedProfile);
       setIsEditing(false);
     } catch (err: any) {
-      toast.error(`Update failed: ${err.message}`);
+      toast.error(err.response?.data?.error || `Update failed: ${err.message}`);
     }
   }
 
-  const displayedPhoto = photoPreview || "/default-profile.png";
+  const displayedPhoto = photoPreview;
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50 flex items-center justify-center">
@@ -181,6 +152,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     </div>
   );
 
+
   return (
     <div className=" min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 pt-4">
 <div className=" max-w-3xl rounded-2xl mx-auto relative h-80 bg-gradient-to-br from-pink-200 via-white to-red-200  shadow overflow-hidden">
@@ -189,7 +161,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
         <div className="absolute bottom-0 mb-20 left-1/2 transform -translate-x-1/2 translate-y-1/2">
           <div className="w-40 h-40 rounded-full border-6 border-white shadow-xl overflow-hidden bg-white relative">
             <img
-              src={displayedPhoto}
+              src={displayedPhoto ?? undefined}
               alt="Profile"
               className="w-full h-full object-cover"
             />
