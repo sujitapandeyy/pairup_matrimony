@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,14 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-type RequestsProps = {
-  requests: any[];
-  setRequests: React.Dispatch<React.SetStateAction<any[]>>;
-  setCurrentView: (view: 'discover' | 'matches' | 'chat' | 'profile' | 'requests') => void;
-};
-
-
 const backendUrl = "http://localhost:5050";
+const DEFAULT_AVATAR = '/defaultboy.jpg';
 
 function getFullImageUrl(imagePath: string | null | undefined) {
   if (!imagePath) return null;
@@ -24,11 +18,10 @@ function getFullImageUrl(imagePath: string | null | undefined) {
   return imagePath;
 }
 
-const DEFAULT_AVATAR = '/defaultboy.jpg'; 
-
-const Requests = ({ requests, setRequests, setCurrentView }: RequestsProps) => {
+const Requests = () => {
   const router = useRouter();
 
+  const [requests, setRequests] = useState<any[]>([]);
   const [currentRequestIndex, setCurrentRequestIndex] = useState(0);
   const [showMatch, setShowMatch] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<any>(null);
@@ -41,21 +34,41 @@ const Requests = ({ requests, setRequests, setCurrentView }: RequestsProps) => {
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        console.log('Stored user:', parsed);
-        setEmail(parsed.email || null);
-
+        setEmail(parsed.email?.toLowerCase() || null);
         const fullImage = getFullImageUrl(parsed.image);
-        console.log('User image URL:', fullImage);
         setUserImage(fullImage || DEFAULT_AVATAR);
       } catch (error) {
         console.error('Failed to parse user:', error);
+        toast.error('Failed to load user info');
       }
+    } else {
+      toast.error('Please log in');
+      router.push('/login');
     }
-  }, []);
+  }, [router]);
+
+  // Fetch requests after email is set
+  useEffect(() => {
+    if (!email) return;
+
+    fetch(`${backendUrl}/matches/notifications?email=${encodeURIComponent(email)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const filtered = data.filter((n: any) =>
+          n.type === 'request' &&
+          n.to?.toLowerCase() === email
+        );
+        setRequests(filtered || []);
+        setCurrentRequestIndex(0);
+      })
+      .catch((err) => {
+        console.error('Failed to load notifications', err);
+        toast.error('Failed to load match requests');
+      });
+  }, [email]);
 
   const handleLikeBack = async (senderEmail: string) => {
     const targetRequest = requests[currentRequestIndex];
-
     try {
       const res = await fetch(`${backendUrl}/matches/swipe`, {
         method: 'POST',
@@ -128,10 +141,10 @@ const Requests = ({ requests, setRequests, setCurrentView }: RequestsProps) => {
   return (
     <div className="flex justify-center">
       <div className="w-full max-w-sm">
-        <Card className="overflow-hidden shadow-2xl border-0 bg-white rounded-3xl transform transition-all duration-300 hover:scale-105">
+        <Card className="overflow-hidden shadow-2xl border-0 mt-3 bg-white rounded-3xl transform transition-all duration-300 hover:scale-105">
           <div className="relative">
             {senderImage ? (
-              <img src={senderImage} alt={currentRequest.sender_name} className="w-full h-96 object-cover" />
+              <img src={senderImage} alt={currentRequest.sender_name} className="w-full h-86 object-cover" />
             ) : (
               <div className="w-full h-96 bg-gray-200 flex items-center justify-center text-gray-500">No Image</div>
             )}
@@ -244,16 +257,15 @@ const Requests = ({ requests, setRequests, setCurrentView }: RequestsProps) => {
 
             <div className="space-y-3">
               <Button
-  onClick={() => {
-    setCurrentView('matches'); 
-    closeMatchModal();
-  }}
-  className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold py-3 rounded-xl"
->
-  <MessageCircle className="w-5 h-5 mr-2" />
-  Start Chat
-</Button>
-
+                onClick={() => {
+                  router.push('/chat');
+                  closeMatchModal();
+                }}
+                className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold py-3 rounded-xl"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                Start Chat
+              </Button>
               <Button variant="outline" onClick={closeMatchModal} className="w-full">
                 Keep Swiping
               </Button>

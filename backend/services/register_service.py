@@ -39,7 +39,7 @@ class RegisterService:
         if any(not field for field in required_fields):
             return {'success': False, 'message': 'Missing required personal details'}, 400
 
-        # Assign default profile image based on gender
+        # default profile image based on gender
         gender = details.get('gender')
         if gender == 'Female':
             profile_image_url = '/img/defaultgirl.jpg'

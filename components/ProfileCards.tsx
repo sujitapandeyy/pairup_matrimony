@@ -66,6 +66,8 @@ const ProfileCards = () => {
     } else {
       if (liked) {
         toast.success('Interest Request sent!');
+      }else{
+        toast.info('Not Interested!');
       }
     }
   } catch (error) {

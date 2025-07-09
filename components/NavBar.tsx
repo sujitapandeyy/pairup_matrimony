@@ -1,151 +1,173 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { MessageCircle, Heart, User, X, Bell, Send } from 'lucide-react';
 
-type NavBarProps = {
-  currentView:
-    | 'discover'
-    | 'matches'
-    | 'chat'
-    | 'profile'
-    | 'requests'
-    | 'sent'; // added 'sent'
-  setCurrentView: (view: NavBarProps['currentView']) => void;
-  requestCount: number;
-  unreadMessageCount: number;
-  sentRequestCount: number; // added count for sent requests
-};
-
-const NavBar = ({
-  currentView,
-  setCurrentView,
-  requestCount,
-  unreadMessageCount,
-  sentRequestCount,
-}: NavBarProps) => {
+const NavBar = () => {
   const router = useRouter();
-  const [userName, setUserName] = useState<string | null>(null);
+  const pathname = usePathname();
+
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [requestCount, setRequestCount] = useState(0);
+  const [sentRequestCount, setSentRequestCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     const storedUser = localStorage.getItem('pairupUser');
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        if (user.name) setUserName(user.name);
+        if (user.email) setUserEmail(user.email);
       } catch {
-        // ignore parse errors
       }
     }
   }, []);
 
-  const onLogout = () => {
-    localStorage.removeItem('pairupUser');
-    router.push('/login');
-  };
+  useEffect(() => {
+    if (!userEmail) return;
+
+    const fetchCounts = () => {
+      fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          const count = Array.isArray(data)
+            ? data.filter((n: any) => n.type === 'request').length
+            : 0;
+          setRequestCount(count);
+        })
+        .catch(() => setRequestCount(0));
+
+     
+      fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          const count = data?.sentRequests?.length || 0;
+          setSentRequestCount(count);
+        })
+        .catch(() => setSentRequestCount(0));
+
+      // Fetch unread chat count
+      // fetch(`http://localhost:5050/chat/unread_count?email=${encodeURIComponent(userEmail)}`)
+      //   .then(res => res.json())
+      //   .then(data => {
+      //     setUnreadChatCount(data.unreadCount || 0);
+      //   })
+      //   .catch(() => setUnreadChatCount(0));
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 10000);
+    return () => clearInterval(interval);
+  }, [userEmail]);
+
+  const currentView = (() => {
+    if (pathname === '/' || pathname === '/dashboard') return 'dashboard';
+    if (pathname.startsWith('/chat')) return 'chat';
+    if (pathname.startsWith('/requests')) return 'requests';
+    if (pathname.startsWith('/sent')) return 'sent';
+    if (pathname.startsWith('/profile')) return 'profile';
+    return '';
+  })();
+
+  const navigate = (page: string) => router.push(page);
 
   return (
     <header className="bg-white/80 backdrop-blur-sm shadow-sm border-b border-pink-100">
       <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center space-x-3 cursor-pointer"
+          aria-label="Go to Dashboard"
+        >
           <div className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
             <Heart className="w-6 h-6 text-white" />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
             Pair-Up
           </h1>
-        </div>
+        </button>
 
         <nav className="flex items-center space-x-6">
-          <button
-            onClick={() => setCurrentView('discover')}
-            className={`p-2 rounded-full transition-colors ${
-              currentView === 'discover'
-                ? 'bg-rose-100 text-rose-600'
-                : 'text-gray-600 hover:text-rose-600'
-            }`}
-            aria-label="Discover"
-          >
-            <Heart className="w-6 h-6" />
-          </button>
-
-          <button
-            onClick={() => setCurrentView('matches')}
-            className={`relative p-2 rounded-full transition-colors ${
-              currentView === 'matches'
-                ? 'bg-rose-100 text-rose-600'
-                : 'text-gray-600 hover:text-rose-600'
-            }`}
-            aria-label="Matches"
-          >
-            <MessageCircle className="w-6 h-6" />
-            {unreadMessageCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
-                {unreadMessageCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setCurrentView('requests')}
-            className={`relative p-2 rounded-full transition-colors ${
-              currentView === 'requests'
-                ? 'bg-rose-100 text-rose-600'
-                : 'text-gray-600 hover:text-rose-600'
-            }`}
-            aria-label="Requests"
-          >
-            <Bell className="w-6 h-6" />
-            {requestCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
-                {requestCount}
-              </span>
-            )}
-          </button>
-
-          {/* New Sent Requests Button */}
-          <button
-            onClick={() => setCurrentView('sent')}
-            className={`relative p-2 rounded-full transition-colors ${
-              currentView === 'sent'
-                ? 'bg-rose-100 text-rose-600'
-                : 'text-gray-600 hover:text-rose-600'
-            }`}
-            aria-label="Sent Requests"
-          >
-            <Send className="w-6 h-6" />
-            {sentRequestCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
-                {sentRequestCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setCurrentView('profile')}
-            className={`p-2 rounded-full transition-colors ${
-              currentView === 'profile'
-                ? 'bg-rose-100 text-rose-600'
-                : 'text-gray-600 hover:text-rose-600'
-            }`}
-            aria-label="Profile"
-          >
-            <User className="w-6 h-6" />
-          </button>
-
-          <button
-            onClick={onLogout}
-            className="text-gray-900 hover:text-gray-600 transition-colors"
-            title="Logout"
-            aria-label="Logout"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <IconButton
+            icon={<Heart className="w-6 h-6" />}
+            label="Dashboard"
+            active={currentView === 'dashboard'}
+            onClick={() => navigate('/dashboard')}
+          />
+          <IconButton
+            icon={<MessageCircle className="w-6 h-6" />}
+            label="Chat"
+            active={currentView === 'chat'}
+            onClick={() => navigate('/chat')}
+            badge={isMounted ? unreadChatCount : undefined}
+          />
+          <IconButton
+            icon={<Bell className="w-6 h-6" />}
+            label="Requests"
+            active={currentView === 'requests'}
+            onClick={() => navigate('/requests')}
+            badge={isMounted ? requestCount : undefined}
+          />
+          <IconButton
+            icon={<Send className="w-6 h-6" />}
+            label="Sent Requests"
+            active={currentView === 'sent'}
+            onClick={() => navigate('/sent')}
+            badge={isMounted ? sentRequestCount : undefined}
+          />
+          <IconButton
+            icon={<User className="w-6 h-6" />}
+            label="Profile"
+            active={currentView === 'profile'}
+            onClick={() => navigate('/profile')}
+          />
+          <IconButton
+            icon={<X className="w-6 h-6" />}
+            label="Logout"
+            onClick={() => {
+              localStorage.removeItem('pairupUser');
+              router.push('/login');
+            }}
+          />
         </nav>
       </div>
     </header>
   );
 };
+
+const IconButton = ({
+  icon,
+  label,
+  onClick,
+  active,
+  badge,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  badge?: number | string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`relative p-2 rounded-full transition-colors ${
+      active ? 'bg-rose-100 text-rose-600' : 'text-gray-600 hover:text-rose-600'
+    }`}
+    aria-label={label}
+    aria-current={active ? 'page' : undefined}
+  >
+    {icon}
+    {Number(badge) > 0 && (
+      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full px-1.5">
+        {badge}
+      </span>
+    )}
+  </button>
+);
 
 export default NavBar;

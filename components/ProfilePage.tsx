@@ -5,10 +5,11 @@ import { MapPin, Edit3, Camera, Calendar, X } from "lucide-react";
 import ProfileView from "./ProfileView";
 import EditProfile from "./EditProfile";
 import { Profile, ProfilePageProps } from "./types";
+import { toast } from "sonner";
 
 const backendUrl = "http://localhost:5050";
 
-const ageGroupOptions = ["18-25", "26-35", "36-45", "46+"];
+// const ageGroupOptions = ["18-25", "26-35", "36-45", "46+"];
 
 function getFullImageUrl(photoPath?: string | null) {
   if (!photoPath) return "/default-profile.png";
@@ -30,7 +31,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
   useEffect(() => {
     if (!userId) {
-      setError("User ID is required");
+      toast.error("User ID is required");
       setLoading(false);
       return;
     }
@@ -49,7 +50,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
         setFormData(data);
         setPhotoPreview(getFullImageUrl(data.photo));
       } catch (err: any) {
-        setError(err.message || "Failed to load profile");
+        toast.error(err.message || "Failed to load profile");
       } finally {
         setLoading(false);
       }
@@ -71,7 +72,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
     const MAX_FILE_SIZE = 5 * 1024 * 1024; 
     if (file.size > MAX_FILE_SIZE) {
-      setUploadError('File size should be less than 5MB');
+      toast.error('File size should be less than 5MB');
       return;
     }
 
@@ -94,7 +95,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Photo upload failed");
+        toast.error(data.error || "Photo upload failed");
       }
 
       const data = await res.json();
@@ -103,7 +104,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
       setProfile((prev) => prev ? { ...prev, photo: data.photoUrl } : null);
       setPhotoPreview(updatedUrl);
     } catch (err: any) {
-      console.error('Photo upload error:', err);
+      toast.error('Photo upload error:', err);
       setUploadError(err.message || "Failed to upload photo");
       setPhotoPreview(profile?.photo ? getFullImageUrl(profile.photo) : null);
     } finally {
@@ -139,14 +140,16 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Failed to update profile");
+        toast.error(data.error || "Failed to update profile");
+      }else{
+        toast.success("Profile updated successfully");
       }
 
       const updatedProfile = await res.json();
       setProfile(updatedProfile);
       setIsEditing(false);
     } catch (err: any) {
-      alert(`Update failed: ${err.message}`);
+      toast.error(`Update failed: ${err.message}`);
     }
   }
 
@@ -179,10 +182,9 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50">
-      <div className="relative h-80 bg-gradient-to-r from-pink-400 via-purple-500 to-indigo-500 overflow-hidden">
-        <div className="absolute inset-0 bg-pink-800 bg-opacity-20"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+    <div className=" min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 pt-4">
+<div className=" max-w-3xl rounded-2xl mx-auto relative h-80 bg-gradient-to-br from-pink-200 via-white to-red-200  shadow overflow-hidden">
+     {/* <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div> */}
 
         <div className="absolute bottom-0 mb-20 left-1/2 transform -translate-x-1/2 translate-y-1/2">
           <div className="w-40 h-40 rounded-full border-6 border-white shadow-xl overflow-hidden bg-white relative">
@@ -234,7 +236,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
           <div className="flex items-center justify-center gap-4 mt-4 text-gray-500">
             <div className="flex items-center gap-1">
               <MapPin className="h-4 w-4" />
-              <span>{profile.location}</span>
+              <span>{(profile.location ?? '').split(' ').slice(0, 2).join(' ')}</span>
             </div>
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />

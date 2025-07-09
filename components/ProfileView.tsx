@@ -24,7 +24,7 @@ export default function ProfileView({ profile, onEditClick }: ProfileViewProps) 
           <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={profile.gender ?? "N/A"} />
           <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={profile.religion ?? "N/A"} />
           <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={profile.maritalStatus ?? "N/A"} />
-          <DetailItem icon={<MapPin className="h-4 w-4" />} label="Location" value={profile.location ?? "N/A"} />
+          {/* <DetailItem icon={<MapPin className="h-4 w-4" />} label="Location" value={profile.location ?? "N/A"} /> */}
         </div>
       </div>
 

@@ -121,7 +121,6 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
 
       setMatches(matchesWithMeta);
 
-      // Calculate total unread messages count across all matches:
       const unreadCount = matchesWithMeta.reduce((acc, m) => {
         const unread =
           m.lastMessage &&
@@ -153,12 +152,12 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
     socketRef.current = socket;
 
     socket.on('online_users', (onlineEmails: string[]) => {
-      setOnlineUsers(onlineEmails); // Save full online users list
+      setOnlineUsers(onlineEmails); 
 
       setMatches((prev) =>
         prev.map((match) => ({
           ...match,
-          online: onlineEmails.includes(match.email), // Update match online status
+          online: onlineEmails.includes(match.email), 
         }))
       );
     });
@@ -230,7 +229,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
             timestamp: lastMsg.timestamp,
           }),
         }).then(() => {
-          fetchMatches(); // Refresh sidebar read state & unread counts
+          fetchMatches(); 
         });
       }
     }
@@ -263,7 +262,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="px-80 flex h-screen bg-gray-50">
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -340,9 +339,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
           </div>
         ) : (
           <>
-            {/* Header */}
             <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
-              {/* Partner */}
               <div className="relative">
                 <img
                   src={selectedChat.images?.[0] || '/default-profile.jpg'}
@@ -372,7 +369,6 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
               </div> */}
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center text-gray-400 italic pt-20">No messages yet. Say hello! 👋</div>
@@ -415,7 +411,6 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
               <div ref={chatEndRef}></div>
             </div>
 
-            {/* Input */}
             <div className="p-4 bg-white border-t border-gray-200">
               <div className="flex items-center gap-3">
                 <input
