@@ -199,7 +199,7 @@ const Requests = () => {
 
       {/* Match Modal */}
       {showMatch && matchedProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-md">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/10 backdrop-blur-xs">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center relative shadow-2xl">
             <button onClick={closeMatchModal} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
               <X className="w-6 h-6" />

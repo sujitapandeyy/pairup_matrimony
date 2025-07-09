@@ -59,6 +59,7 @@ class MatchService:
 
             photo_url = self.build_photo_url(request, user.get("photo"))
             profiles.append({
+                "id": str(user["_id"]),  
                 "name": user.get("name"),
                 "email": email,
                 "age": detail.get("age"),
@@ -71,6 +72,7 @@ class MatchService:
                 "is_match": email in liked_by_emails
             })
         return profiles
+
 
     def swipe(self, swiper, target, liked):
         self.swipes.update_one(
@@ -188,7 +190,6 @@ class MatchService:
                 "email": user.get("email"),
                 "images": [photo_url],
                 # "location": detail.get("location"),
-                # "online": True  # Optional: add if you support real-time status
             })
         return profiles
 

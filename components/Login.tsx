@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import api from '@/lib/api'
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' })
@@ -16,47 +17,53 @@ export default function Login() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const res = await fetch('http://localhost:5050/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
+  try {
+    const res = await api.post('/auth/login', formData, {
+      headers: { 'Content-Type': 'application/json' }
+    });
 
-      const data = await res.json()
+    const data = res.data;
 
-      if (res.ok && data.success) {
-        const { id, name, email, interests_completed, role } = data.user
+    if (res.status === 200 && data.success) {
+      const { id, name, email, interests_completed, role, status } = data.user;
 
-        const completed = interests_completed === true || interests_completed === 'true'
-
-        localStorage.setItem(
-          'pairupUser',
-          JSON.stringify({ id, email, name, interests_completed: completed, role })
-        )
-
-        toast.success('Login successful!')
-
-        // Redirect based on role
-        if (role === 'admin') {
-          router.push('/admin/dashboard')
-        } else if (completed) {
-          router.push('/user_dashboard')
-        } else {
-          router.push('/interests')
-        }
-      } else {
-        toast.error('Login failed. Please try again.')
+      if (status !== 'active') {
+        toast.error(`Your account is currently '${status}'. Please contact support.`);
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      toast.error('Server error.')
-    } finally {
-      setLoading(false)
+
+      const completed =
+        interests_completed === true || interests_completed === 'true';
+
+      localStorage.setItem(
+        'pairupUser',
+        JSON.stringify({ id, email, name, interests_completed: completed, role })
+      );
+
+      toast.success('Login successful!');
+
+      if (role === 'admin') {
+        router.push('/admin/dashboard');
+      } else if (completed) {
+        router.push('/user_dashboard');
+      } else {
+        router.push('/interests');
+      }
+    } else {
+      toast.error(data.message || 'Login failed. Please try again.');
     }
+  } catch (err) {
+    toast.error('Server error.');
+  } finally {
+    setLoading(false);
   }
+};
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">

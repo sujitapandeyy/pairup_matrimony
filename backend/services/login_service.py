@@ -12,14 +12,13 @@ class LoginService:
         if not user or not check_password_hash(user['password'], password):
             return {'success': False, 'message': 'Invalid email or password'}, 401
 
-        # Extract role, default to 'user' if not present
         role = user.get('role', 'user')
         session['user_email'] = user['email']
         session['user_name'] = user['name']
+        session['user_status'] = user['status']
         session['user_id'] = str(user['_id'])
         session['role'] = role
 
-        # Get interests_completed only if it's a regular user
         interests_completed = user.get('interests_completed', False) if role == 'user' else None
 
         return {
@@ -29,6 +28,7 @@ class LoginService:
                 'id': str(user['_id']),
                 'name': user['name'],
                 'email': user['email'],
+                'status': user['status'],
                 'role': role,
                 **({'interests_completed': interests_completed} if role == 'user' else {})
             }
