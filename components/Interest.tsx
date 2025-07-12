@@ -136,7 +136,7 @@ export default function Interests() {
             <option value="">Preferred Gender</option>
             <option>Male</option>
             <option>Female</option>
-            <option>Other</option>
+            {/* <option>Other</option> */}
             <option>Any</option>
           </select>
 

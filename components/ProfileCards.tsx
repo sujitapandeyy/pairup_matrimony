@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Heart, X, MapPin, Briefcase, GraduationCap } from 'lucide-react'
+import { Heart, X, MapPin, Briefcase, GraduationCap, HeartHandshake } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
+import { Badge } from './ui/badge'
 
 const ProfileCards = () => {
   const router = useRouter()
@@ -32,7 +33,7 @@ const ProfileCards = () => {
     api
       .get(`/matches/get_profiles?email=${encodeURIComponent(email)}`)
       .then((res) => {
-        const filteredProfiles = res.data.filter((profile: any) => profile.email !== email)
+const filteredProfiles = res.data.profiles.filter((profile: any) => profile.email !== email)
         setProfiles(filteredProfiles)
         setCurrentIndex(0)
       })
@@ -81,7 +82,6 @@ const ProfileCards = () => {
     <div className="flex justify-center">
       <div className="w-full max-w-sm">
         <Card className="overflow-hidden shadow-2xl border-0 bg-white rounded-3xl transform transition-all duration-300 hover:scale-105">
-          {/* IMAGE: clickable */}
           <div
             className="relative cursor-pointer"
             onClick={onImageClick}
@@ -99,7 +99,6 @@ const ProfileCards = () => {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-            {/* Overlay info - not clickable */}
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none">
               <h2 className="text-3xl font-bold mb-2">
                 {currentProfile.name}, {currentProfile.age}
@@ -107,7 +106,8 @@ const ProfileCards = () => {
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span>
+                  <span className="text-sm">{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span><span className="text-sm">{currentProfile.distance_km} km</span>
+
                 </div>
                 <div className="flex items-center space-x-2">
                   <Briefcase className="w-4 h-4" />
@@ -117,11 +117,41 @@ const ProfileCards = () => {
                   <GraduationCap className="w-4 h-4" />
                   <span className="text-sm">{currentProfile.education}</span>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Badge
+                                  className={`text-xs px-2 py-1 text-white ${
+                                    currentProfile.compatibility_score >= 90
+                                      ? 'bg-green-700'
+                                      : currentProfile.compatibility_score >= 80
+                                      ? 'bg-green-600'
+                                      : currentProfile.compatibility_score >= 70
+                                      ? 'bg-green-500'
+                                      : currentProfile.compatibility_score >= 60
+                                      ? 'bg-yellow-500'
+                                      : currentProfile.compatibility_score >= 50
+                                      ? 'bg-yellow-400'
+                                      : currentProfile.compatibility_score >= 40
+                                      ? 'bg-orange-400'
+                                      : currentProfile.compatibility_score >= 30
+                                      ? 'bg-orange-500'
+                                      : currentProfile.compatibility_score >= 20
+                                      ? 'bg-red-500'
+                                      : 'bg-red-600'
+                                  }`}
+                                >
+                                  {currentProfile.compatibility_score}% Compatible
+                                </Badge>
+                 
+
+              </div>
+
+                {/* <div className="flex items-center space-x-2">
+                  <MapPin className="w-4 h-4" />
+                  <span className="text-sm">{currentProfile.distance_km} km</span>
+                </div> */}
               </div>
             </div>
           </div>
-
-          {/* BOTTOM PART: NOT CLICKABLE */}
           <CardContent className="p-6 pointer-events-none">
             <p className="text-gray-700 mb-4 leading-relaxed">
               {currentProfile.bio || currentProfile.caption || ''}
@@ -143,7 +173,6 @@ const ProfileCards = () => {
               </div>
             )}
 
-            {/* BUTTONS: clickable */}
             <div className="flex justify-center space-x-4 pointer-events-auto">
               <Button
                 onClick={async (e) => {

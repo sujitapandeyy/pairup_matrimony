@@ -14,6 +14,7 @@ import {
   Eraser,
   Info,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const NavBar = () => {
   const router = useRouter();
@@ -169,6 +170,7 @@ const NavBar = () => {
                 onClick={() => {
                   localStorage.removeItem('pairupUser');
                   router.push('/login');
+                  toast.success('Logged out successfully');
                 }}
               />
             </>

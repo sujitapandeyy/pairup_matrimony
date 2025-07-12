@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
 from services.match_service import MatchService
 from bson.errors import InvalidId
+from services.match_algorithm import MatchAlgorithm
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 match_bp = Blueprint("match_bp", __name__)
 
@@ -9,7 +12,7 @@ def get_profiles():
     email = request.args.get("email")
     if not email:
         return jsonify({"error": "Missing email"}), 400
-    service = MatchService(current_app.mongo.db)
+    service = MatchAlgorithm(current_app.mongo.db)
     profiles = service.get_profiles(request, email)
     return jsonify(profiles), 200
 
@@ -98,3 +101,12 @@ def cancel_sent_request():
     else:
         return jsonify({"error": "Request not found"}), 404
 
+def _calculate_trait_similarity(self, traits1, traits2):
+    if not traits1 or not traits2:
+        return 0
+    text1 = " ".join(traits1)
+    text2 = " ".join(traits2)
+    vectorizer = CountVectorizer().fit_transform([text1, text2])
+    vectors = vectorizer.toarray()
+    cos_sim = cosine_similarity([vectors[0]], [vectors[1]])[0][0]
+    return cos_sim

@@ -1,10 +1,12 @@
 'use client';
 
 import React, { ChangeEvent } from "react";
+import dynamic from 'next/dynamic';
 import { Heart, Camera, Check, X, Briefcase, GraduationCap, Users } from "lucide-react";
 import { Profile } from "./types";
-import api from '@/lib/api'
-import { toast } from 'sonner'
+import { toast } from 'sonner';
+
+const LocationInput = dynamic(() => import('@/components/LocationInput'), { ssr: false });
 
 interface EditProfileProps {
   profile: Profile;
@@ -53,6 +55,7 @@ export default function EditProfile({
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
+      {/* Photo Section */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Camera className="h-6 w-6 text-blue-500" />
@@ -102,6 +105,7 @@ export default function EditProfile({
         </div>
       </div>
 
+      {/* Personal Info */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Users className="h-6 w-6 text-pink-500" />
@@ -113,10 +117,31 @@ export default function EditProfile({
           <SelectField label="Gender" name="gender" value={formData.gender ?? ""} onChange={onFormChange} options={genderOptions} />
           <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
           <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
-          <InputField label="Location" name="location" value={formData.location ?? ""} onChange={onFormChange} />
+          
+          {/* Location Autocomplete */}
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-700">
+              Location
+            </label>
+            <LocationInput
+              value={formData.location || ''}
+              onSelect={(loc) => {
+                onFormChange({
+                  target: { name: 'location', value: loc.display_name }
+                } as any)
+                onFormChange({
+                  target: { name: 'latitude', value: loc.lat }
+                } as any)
+                onFormChange({
+                  target: { name: 'longitude', value: loc.lon }
+                } as any)
+              }}
+            />
+          </div>
         </div>
       </div>
 
+      {/* Professional Info */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Briefcase className="h-6 w-6 text-purple-500" />
@@ -135,6 +160,7 @@ export default function EditProfile({
         </div>
       </div>
 
+      {/* Preferences */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Heart className="h-6 w-6 text-red-500" />
@@ -150,15 +176,8 @@ export default function EditProfile({
         </div>
       </div>
 
+      {/* Save Button */}
       <div className="flex justify-center gap-4">
-        {/* <button
-          type="button"
-          onClick={onCancel}
-          className="bg-gray-200 text-gray-800 px-8 py-3 rounded-full hover:bg-gray-300 transition-all duration-200 flex items-center gap-2 text-lg font-semibold shadow"
-        >
-          <X className="h-5 w-5" />
-          Cancel
-        </button> */}
         <button
           type="submit"
           disabled={uploadingPhoto}
