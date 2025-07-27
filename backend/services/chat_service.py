@@ -25,7 +25,7 @@ class ChatService:
             return jsonify({'error': 'Missing user1 or user2 parameter'}), 400
 
         mongo = current_app.mongo
-        messages_cursor = mongo.db.chat_threads.find({
+        messages_cursor = mongo.db.chat_messages.find({
             '$or': [
                 {'sender': user1, 'receiver': user2},
                 {'sender': user2, 'receiver': user1}

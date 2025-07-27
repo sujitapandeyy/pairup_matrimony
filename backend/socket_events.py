@@ -27,7 +27,7 @@ def register_socketio_events(app):
         user_email = request.args.get('email')
         if user_email:
             online_users.add(user_email)
-            print(f"✅ {user_email} connected")
+            print(f" {user_email} connected")
             emit('online_users', list(online_users), broadcast=True)
 
     @socketio.on('disconnect')
@@ -35,7 +35,7 @@ def register_socketio_events(app):
         user_email = request.args.get('email')
         if user_email:
             online_users.discard(user_email)
-            print(f"❌ {user_email} disconnected")
+            print(f" {user_email} disconnected")
             emit('online_users', list(online_users), broadcast=True)
 
     @socketio.on('join_room')
@@ -44,16 +44,16 @@ def register_socketio_events(app):
         user2 = data.get('user2')
         room = get_room_id(user1, user2)
         if room:
-            print(f"✅ {user1} joined room with {user2}")
+            print(f" {user1} joined room with {user2}")
             join_room(room)
         else:
-            print("❌ Invalid join_room data:", data)
+            print(" Invalid join_room data:", data)
 
     @socketio.on('send_message')
     def handle_send_message(data):
         required_keys = ['sender', 'receiver', 'message']
         if not all(k in data for k in required_keys):
-            print("❌ Invalid message data received:", data)
+            print(" Invalid message data received:", data)
             return
 
         room = get_room_id(data['sender'], data['receiver'])
@@ -66,10 +66,10 @@ def register_socketio_events(app):
 
         try:
             db = current_app.mongo.db
-            result = db.chat_threads.insert_one(chat)
+            result = db.chat_messages.insert_one(chat)
             chat['_id'] = str(result.inserted_id)  
         except Exception as e:
-            print("❌ Error saving message to DB:", str(e))
+            print(" Error saving message to DB:", str(e))
 
         emit('receive_message', {
             **chat,

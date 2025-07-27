@@ -25,26 +25,26 @@ import { AuthDropdown } from "@/components/AuthDropdown";
 import { useRouter, usePathname } from 'next/navigation';
 
 // Placeholder Register Component
-// const RegisterComponent = ({ onBack }: { onBack: () => void }) => (
-//   <div className="min-h-screen flex items-center justify-center bg-pink-50 text-center">
-//     <div>
-//       <h2 className="text-3xl font-bold mb-4">Register</h2>
-//       <p className="mb-6">Registration form goes here...</p>
-//       <Button onClick={onBack}>Back</Button>
-//     </div>
-//   </div>
-// );
+const RegisterComponent = ({ onBack }: { onBack: () => void }) => (
+  <div className="min-h-screen flex items-center justify-center bg-pink-50 text-center">
+    <div>
+      <h2 className="text-3xl font-bold mb-4">Register</h2>
+      <p className="mb-6">Registration form goes here...</p>
+      <Button onClick={onBack}>Back</Button>
+    </div>
+  </div>
+);
 
-// // Placeholder Login Component
-// const LoginComponent = ({ onBack }: { onBack: () => void }) => (
-//   <div className="min-h-screen flex items-center justify-center bg-purple-50 text-center">
-//     <div>
-//       <h2 className="text-3xl font-bold mb-4">Login</h2>
-//       <p className="mb-6">Login form goes here...</p>
-//       <Button onClick={onBack}>Back</Button>
-//     </div>
-//   </div>
-// );
+// Placeholder Login Component
+const LoginComponent = ({ onBack }: { onBack: () => void }) => (
+  <div className="min-h-screen flex items-center justify-center bg-purple-50 text-center">
+    <div>
+      <h2 className="text-3xl font-bold mb-4">Login</h2>
+      <p className="mb-6">Login form goes here...</p>
+      <Button onClick={onBack}>Back</Button>
+    </div>
+  </div>
+);
 
 // Feature items
 const features = [
@@ -105,7 +105,7 @@ const steps = [
   },
 ];
 
-export default function HomePage() {
+const HeroIndex = () => {
       const router = useRouter();
     
   const [currentView, setCurrentView] = useState<
@@ -114,13 +114,13 @@ export default function HomePage() {
   const [user, setUser] = useState(null);
 
   // View switching logic
-  // if (currentView === "register") {
-  //   return <RegisterComponent onBack={() => setCurrentView("landing")} />;
-  // }
+  if (currentView === "register") {
+    return <RegisterComponent onBack={() => setCurrentView("landing")} />;
+  }
 
-  // if (currentView === "login") {
-  //   return <LoginComponent onBack={() => setCurrentView("landing")} />;
-  // }
+  if (currentView === "login") {
+    return <LoginComponent onBack={() => setCurrentView("landing")} />;
+  }
   const navigate = (page: string) => router.push(page);
 
   return (
@@ -457,3 +457,4 @@ export default function HomePage() {
   );
 };
 
+export default HeroIndex;

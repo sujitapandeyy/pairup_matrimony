@@ -57,7 +57,7 @@ export default function Login() {
       toast.error(data.message || 'Login failed. Please try again.');
     }
   } catch (err) {
-    toast.error('Server error.');
+    toast.error('Invalid Credentials.');
   } finally {
     setLoading(false);
   }
