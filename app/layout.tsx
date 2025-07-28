@@ -25,7 +25,7 @@ export default function RootLayout({
   const pathname = usePathname();
 
   // Hide navbar on /login and /register
-  const hideNavBar = ["/login", "/register", '/interest', '/'].includes(pathname);
+  const hideNavBar = ["/login", "/register", '/interest', '/','/interests'].includes(pathname);
   // const hideNavBar = [""].includes(pathname);
 
   return (

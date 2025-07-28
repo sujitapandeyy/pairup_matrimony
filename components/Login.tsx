@@ -1,83 +1,97 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { toast } from 'sonner'
-import api from '@/lib/api'
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { toast } from "sonner";
+import api from "@/lib/api";
+import { Heart } from "lucide-react";
 
 export default function Login() {
-  const [formData, setFormData] = useState({ email: '', password: '' })
-  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
 
-  const router = useRouter()
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const res = await api.post('/auth/login', formData, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    try {
+      const res = await api.post("/auth/login", formData, {
+        headers: { "Content-Type": "application/json" },
+      });
 
-    const data = res.data;
+      const data = res.data;
 
-    if (res.status === 200 && data.success) {
-      const { id, name, email, interests_completed, role, status } = data.user;
+      if (res.status === 200 && data.success) {
+        const { id, name, email, interests_completed, role, status } =
+          data.user;
 
-      if (status !== 'active') {
-        toast.error(`Your account is currently '${status}'. Please contact support.`);
-        setLoading(false);
-        return;
-      }
+        if (status !== "active") {
+          toast.error(
+            `Your account is currently '${status}'. Please contact support.`
+          );
+          setLoading(false);
+          return;
+        }
 
-      const completed =
-        interests_completed === true || interests_completed === 'true';
+        const completed =
+          interests_completed === true || interests_completed === "true";
 
-      localStorage.setItem(
-        'pairupUser',
-        JSON.stringify({ id, email, name, interests_completed: completed, role })
-      );
+        localStorage.setItem(
+          "pairupUser",
+          JSON.stringify({
+            id,
+            email,
+            name,
+            interests_completed: completed,
+            role,
+          })
+        );
 
-      toast.success('Login successful!');
+        toast.success("Login successful!");
 
-      if (role === 'admin') {
-        router.push('/admin/dashboard');
-      } else if (completed) {
-        router.push('/user_dashboard');
+        if (role === "admin") {
+          router.push("/admin/dashboard");
+        } else if (completed) {
+          router.push("/user_dashboard");
+        } else {
+          router.push("/interests");
+        }
       } else {
-        router.push('/interests');
+        toast.error(data.message || "Login failed. Please try again.");
       }
-    } else {
-      toast.error(data.message || 'Login failed. Please try again.');
+    } catch (err) {
+      toast.error("Invalid Credentials.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    toast.error('Invalid Credentials.');
-  } finally {
-    setLoading(false);
-  }
-};
-
-
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white shadow-xl rounded-xl max-w-md w-full p-8">
-        <h1 className="text-3xl font-serif font-bold text-maroon-700 mb-6 text-center">
+        <h1 className="text-3xl font-serif font-bold text-pink-00 mb-4 text-center flex items-center justify-center gap-2">
+          {/* <span className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
+            <Heart className="w-6 h-6 text-white" />
+          </span> */}
           Welcome Back
         </h1>
-        <p className="text-center text-gray-600 mb-8 font-medium">
+        <p className="text-center text-pink-600 mb-8 font-medium">
           Login to your PairUp account
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label htmlFor="email" className="block text-gray-700 font-semibold mb-1">
+            <label
+              htmlFor="email"
+              className="block text-gray-700 font-semibold mb-1"
+            >
               Email Address
             </label>
             <input
@@ -93,7 +107,10 @@ export default function Login() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-gray-700 font-semibold mb-1">
+            <label
+              htmlFor="password"
+              className="block text-gray-700 font-semibold mb-1"
+            >
               Password
             </label>
             <input
@@ -113,19 +130,22 @@ export default function Login() {
             disabled={loading}
             className="w-full bg-orange-700 hover:bg-orange-800 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Don’t have an account?{' '}
-            <Link href="/register" className="text-maroon-700 font-semibold hover:underline">
+            Don’t have an account?{" "}
+            <Link
+              href="/register"
+              className="text-maroon-700 font-semibold hover:underline"
+            >
               Register here
             </Link>
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

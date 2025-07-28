@@ -1,6 +1,8 @@
+import email
 from werkzeug.security import generate_password_hash
 from models.user_model import UserModel
 from models.user_detail_model import UserDetailModel
+import re
 
 class RegisterService:
     def __init__(self, db):
@@ -10,13 +12,16 @@ class RegisterService:
     def register_user(self, data):
         name = data.get('name')
         email = data.get('email')
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         password = data.get('password')
         status = data.get('status', 'active')
-        role = data.get('role', 'user')  # ✅ default to user
+        role = data.get('role', 'user') 
         details = data.get('details')
 
         if not all([name, email, password, status]):
             return {'success': False, 'message': 'Missing required fields'}, 400
+        if not re.match(email_regex, email):
+            return {'success': False, 'message': 'Invalid email format'}, 400
 
         if self.user_model.get_by_email(email):
             return {'success': False, 'message': 'Email already registered'}, 409
@@ -29,7 +34,7 @@ class RegisterService:
             'status': status,
             'password': hashed_password,
             'role': role,
-            'photo': '/img/defaultboy.jpg',  # fallback default
+            'photo': '/img/defaultboy.jpg', 
         }
 
         # Admins don’t need details or interests
@@ -57,10 +62,12 @@ class RegisterService:
         required_fields = [
             details.get('gender'),
             details.get('religion'),
+            details.get('caste'),
             details.get('location'),
             details.get('maritalStatus'),
             details.get('education'),
             details.get('profession'),
+            details.get('interest'),
         ]
         if any(not field for field in required_fields):
             return {'success': False, 'message': 'Missing required personal details'}, 400
@@ -68,7 +75,7 @@ class RegisterService:
         # Profile image based on gender
         gender = details.get('gender')
         user_doc['photo'] = '/img/defaultgirl.jpg' if gender == 'Female' else '/img/defaultboy.jpg'
-        user_doc['interests_completed'] = False  # ✅ only for normal users
+        user_doc['interests_completed'] = False  
 
         try:
             user_result = self.user_model.create_user(user_doc)
@@ -79,6 +86,7 @@ class RegisterService:
                 'age': age,
                 'gender': gender,
                 'religion': details.get('religion'),
+                'caste': details.get('caste'),
                 'location': details.get('location'),
                 'latitude': latitude,
                 'longitude': longitude,
@@ -86,7 +94,8 @@ class RegisterService:
                 'marital_status': details.get('maritalStatus'),
                 'education': details.get('education'),
                 'profession': details.get('profession'),
-                'personality': details.get('personality', []),
+                'personality': details.get('personality'),
+                'interest': details.get('interest', []),
                 'caption': details.get('caption', '')
             }
 
