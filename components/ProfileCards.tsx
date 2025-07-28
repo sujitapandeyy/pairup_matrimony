@@ -72,7 +72,10 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
 
   const onImageClick = () => {
     if (currentProfile?.id) {
-      router.push(`/user/${currentProfile.id}`)
+          const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+    router.push(`/user/${currentProfile.id}?from=${encodeURIComponent(window.location.pathname)}&index=${currentIndex}&scroll=${scrollPosition}`);
+
+      // router.push(`/user/${currentProfile.id}`)
     } else {
       toast.error('User ID not found!')
     }
@@ -157,11 +160,11 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
               {currentProfile.bio || currentProfile.caption || ''}
             </p>
 
-            {Array.isArray(currentProfile.personality) && currentProfile.personality.length > 0 && (
+            {Array.isArray(currentProfile.hobbies) && currentProfile.hobbies.length > 0 && (
               <div className="mt-4 mb-6">
-                <h3 className="font-semibold text-gray-800 mb-2">Personality Traits</h3>
+                <h3 className="font-semibold text-gray-800 mb-2">Hobbies</h3>
                 <div className="flex flex-wrap gap-2">
-                  {currentProfile.personality.map((trait: string, index: number) => (
+                  {currentProfile.hobbies.map((trait: string, index: number) => (
                     <span
                       key={index}
                       className="bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium"

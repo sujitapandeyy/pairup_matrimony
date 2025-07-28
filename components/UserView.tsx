@@ -1,24 +1,30 @@
 'use client';
 
 import { useEffect, useState, ChangeEvent, FormEvent } from 'react';
-import { Heart, Briefcase, GraduationCap, Mail, Calendar, Users, Home, X } from 'lucide-react';
+import { Heart, Briefcase, GraduationCap, Mail, Calendar, Users, Home, X, Church, Baby, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface UserViewProps {
   userId: string;
 }
 
 export default function UserView({ userId }: UserViewProps) {
-  const [profile, setProfile] = useState<any>(null);
-  const [uploadingPhoto] = useState(false);
-
-  const [showReportModal, setShowReportModal] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get('from');
+  const scrollPosition = searchParams.get('scroll');
+  const profileIndex = searchParams.get('index');
+    const [showReportModal, setShowReportModal] = useState(false);
   const [reason, setReason] = useState('');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [submittingReport, setSubmittingReport] = useState(false);
   const [reportSuccess, setReportSuccess] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [uploadingPhoto] = useState(false);
+
 
   useEffect(() => {
     async function fetchProfile() {
@@ -26,11 +32,25 @@ export default function UserView({ userId }: UserViewProps) {
         const res = await api.get(`/api/user/profile/${userId}`);
         setProfile(res.data);
       } catch (error) {
-        toast.error('Failed to fetch user profile:');
+        toast.error('Failed to fetch user profile');
       }
     }
     fetchProfile();
   }, [userId]);
+
+  const handleBack = () => {
+    if (from) {
+      // Create the return URL with all original parameters
+      const returnUrl = new URL(from, window.location.origin);
+      returnUrl.searchParams.set('restoreIndex', profileIndex || '0');
+      returnUrl.searchParams.set('restoreScroll', scrollPosition || '0');
+      
+      // Navigate back with state
+      router.push(returnUrl.toString());
+    } else {
+      router.back();
+    }
+  };
 
   if (!profile) {
     return <div className="p-10 text-center text-gray-500">Loading profile...</div>;
@@ -95,6 +115,15 @@ export default function UserView({ userId }: UserViewProps) {
   return (
     <>
       <div className="max-w-3xl rounded-2xl mx-auto relative h-80 bg-gradient-to-br from-pink-200 via-white to-red-200 shadow overflow-hidden mb-10 mt-7">
+     <div className="max-w-3xl mx-auto pt-4 px-4">
+        <button 
+          onClick={handleBack}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Back</span>
+        </button>
+      </div>
         <div className="absolute bottom-0 mb-20 left-1/2 transform -translate-x-1/2 translate-y-1/2">
           <div className="w-40 h-40 rounded-full border-6 border-white shadow-xl overflow-hidden bg-white relative">
             <img
@@ -129,18 +158,15 @@ export default function UserView({ userId }: UserViewProps) {
           <DetailItem icon={<Mail className="h-4 w-4" />} label="Email" value={safe(profile.email)} />
           <DetailItem icon={<Calendar className="h-4 w-4" />} label="Age" value={safe(profile.age)} />
           <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={safe(profile.gender)} />
+          <DetailItem icon={<Church className="h-4 w-4" />} label="Caste" value={safe(profile.caste)} />
+          <DetailItem icon={<Baby className="h-4 w-4" />} label="Personality" value={safe(profile.personality)} />
           <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={safe(profile.religion)} />
           <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={safe(profile.marital_status)} />
-        </InfoCard>
-
-        <InfoCard title="Professional Details" icon={<Briefcase className="h-6 w-6 text-purple-500" />}>
-          <DetailItem icon={<GraduationCap className="h-4 w-4" />} label="Education" value={safe(profile.education)} />
-          <DetailItem icon={<Briefcase className="h-4 w-4" />} label="Profession" value={safe(profile.profession)} />
-          {profile.personality && profile.personality.length > 0 && (
+          {profile.hobbies && profile.hobbies.length > 0 && (
             <div className="mt-6">
-              <h4 className="font-semibold text-gray-800 mb-3">Personality Traits</h4>
+              <h4 className="font-semibold text-gray-800 mb-3">Hobbies Traits</h4>
               <div className="flex flex-wrap gap-2">
-                {profile.personality.map((trait: string, idx: number) => (
+                {profile.hobbies.map((trait: string, idx: number) => (
                   <span
                     key={idx}
                     className="bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium"
@@ -151,6 +177,11 @@ export default function UserView({ userId }: UserViewProps) {
               </div>
             </div>
           )}
+        </InfoCard>
+
+        <InfoCard title="Professional Details" icon={<Briefcase className="h-6 w-6 text-purple-500" />}>
+          <DetailItem icon={<GraduationCap className="h-4 w-4" />} label="Education" value={safe(profile.education)} />
+          <DetailItem icon={<Briefcase className="h-4 w-4" />} label="Profession" value={safe(profile.profession)} />
         </InfoCard>
 
         <InfoCard title="Looking For" icon={<Heart className="h-6 w-6 text-red-500" />}>

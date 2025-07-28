@@ -12,8 +12,8 @@ mongo = PyMongo(app)
 app.mongo = mongo
 
 Session(app)
-# CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
-CORS(app, origins=["http://192.168.1.187:3000"], supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+# CORS(app, origins=["http://192.168.1.187:3000"], supports_credentials=True)
 
 @app.route('/uploads/reports/<filename>')
 def serve_report_proof(filename):
@@ -40,5 +40,5 @@ app.register_blueprint(report_bp)
 
 if __name__ == '__main__':
     socketio.init_app(app)
-    # socketio.run(app, host='127.0.0.1', port=5050, debug=True)
-socketio.run(app, host='0.0.0.0', port=5050, debug=True)
+    socketio.run(app, host='127.0.0.1', port=5050, debug=True)
+# socketio.run(app, host='0.0.0.0', port=5050, debug=True)

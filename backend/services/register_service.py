@@ -67,7 +67,7 @@ class RegisterService:
             details.get('maritalStatus'),
             details.get('education'),
             details.get('profession'),
-            details.get('interest'),
+            details.get('hobbies'),
         ]
         if any(not field for field in required_fields):
             return {'success': False, 'message': 'Missing required personal details'}, 400
@@ -95,7 +95,7 @@ class RegisterService:
                 'education': details.get('education'),
                 'profession': details.get('profession'),
                 'personality': details.get('personality'),
-                'interest': details.get('interest', []),
+                'hobbies': details.get('hobbies', []),
                 'caption': details.get('caption', '')
             }
 

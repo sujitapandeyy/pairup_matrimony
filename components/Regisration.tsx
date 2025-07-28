@@ -32,7 +32,7 @@ export default function Registration() {
     education: "",
     profession: "",
     personality: "",
-    interest: [] as string[],
+    hobbies: [] as string[],
     caption: "",
   });
 
@@ -69,10 +69,10 @@ export default function Registration() {
   };
 
   const toggleCheckbox = (item: string) => {
-    const updated = detailsData.interest.includes(item)
-      ? detailsData.interest.filter((i) => i !== item)
-      : [...detailsData.interest, item];
-    setDetailsData({ ...detailsData, interest: updated });
+    const updated = detailsData.hobbies.includes(item)
+      ? detailsData.hobbies.filter((i) => i !== item)
+      : [...detailsData.hobbies, item];
+    setDetailsData({ ...detailsData, hobbies: updated });
   };
 
   const handleNext = async (e: React.FormEvent) => {
@@ -100,7 +100,7 @@ export default function Registration() {
       education,
       profession,
       personality,
-      interest,
+      hobbies,
       caption,
       latitude,
       longitude,
@@ -115,7 +115,7 @@ export default function Registration() {
       !education ||
       !profession ||
       !personality ||
-      interest.length === 0
+      hobbies.length === 0
     ) {
       return toast.error("Fill all required fields");
     }
@@ -161,7 +161,7 @@ export default function Registration() {
     }
   };
 
-  const interestsList = [
+  const hobbiesList = [
     "Traveling",
     "Cooking",
     "Art",
@@ -423,22 +423,22 @@ export default function Registration() {
                 onSelect={handleLocationSelect}
               />
               <div>
-                <p className="mb-2 font-semibold">Select your Interests:</p>
+                <p className="mb-2 font-semibold">Select your hobbies:</p>
                 <div className="flex flex-wrap gap-2">
-                  {interestsList.map((item) => (
+                  {hobbiesList.map((item) => (
                     <label
                       key={item}
                       className={`cursor-pointer rounded-lg px-4 py-2 border ${
-                        detailsData.interest.includes(item)
+                        detailsData.hobbies.includes(item)
                           ? "bg-green-700 text-white border-green-700"
                           : "border-gray-300 text-gray-700 hover:bg-green-100"
                       } transition`}
                     >
                       <input
                         type="checkbox"
-                        name="interest"
+                        name="hobbies"
                         value={item}
-                        checked={detailsData.interest.includes(item)}
+                        checked={detailsData.hobbies.includes(item)}
                         onChange={() => toggleCheckbox(item)}
                         className="hidden"
                       />

@@ -50,7 +50,7 @@ class ProfileService:
             "name": user.get("name"),
             "email": user.get("email"),
             "photo": user.get("photo"),
-            "personality": details.get("personality", []) if details else [],
+            "hobbies": details.get("hobbies", []) if details else [],
             "interestsCompleted": user.get("interests_completed", False),
         }
 
@@ -60,6 +60,7 @@ class ProfileService:
                 "height": details.get("height"),
                 "caste": details.get("caste"),
                 "personality": details.get("personality"),
+                "hobbies": details.get("hobbies", []) if details else [],
                 "gender": details.get("gender"),
                 "location": details.get("location"),
                 "maritalStatus": details.get("marital_status"),
@@ -95,7 +96,8 @@ class ProfileService:
             "education": "education",
             "profession": "profession",
             "caption": "caption",
-            "personality": "personality"
+            "personality": "personality",
+            "hobbies": "hobbies"
         }
         for key, db_key in fields.items():
             if key in data:
