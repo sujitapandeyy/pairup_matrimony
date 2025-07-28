@@ -4,12 +4,15 @@ export interface Profile {
   photo?: string | null;
   interestsCompleted: boolean;
   age?: string;
+  height?: string;
   location?: string;
   fullLocation?: string;
   coordinates?: number[];
   maritalStatus?: string;
+  caste?: string;
   gender?: string;
-  personality?: string[];
+  interest?: string[];
+  personality?: string;
   religion?: string;
   education?: string;
   profession?: string;

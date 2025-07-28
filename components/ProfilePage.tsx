@@ -173,7 +173,7 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
           </div>
         </div>
 
-        <div className="absolute top-6 right-6">
+        <div className="absolute top-6 right-6 ">
           <button
             onClick={() => {
               setIsEditing((prev) => !prev);

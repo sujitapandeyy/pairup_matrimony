@@ -355,19 +355,19 @@ export default function Registration() {
                 required
               >
                 <option value="">Select Height</option>
-                <option value="4'10&quot; (147 cm)">4'10" (147 cm)</option>
-                <option value="4'11&quot; (150 cm)">4'11" (150 cm)</option>
-                <option value="5'0&quot; (152 cm)">5'0" (152 cm)</option>
-                <option value="5'1&quot; (155 cm)">5'1" (155 cm)</option>
-                <option value="5'2&quot; (157 cm)">5'2" (157 cm)</option>
-                <option value="5'3&quot; (160 cm)">5'3" (160 cm)</option>
-                <option value="5'4&quot; (163 cm)">5'4" (163 cm)</option>
-                <option value="5'5&quot; (165 cm)">5'5" (165 cm)</option>
-                <option value="5'6&quot; (168 cm)">5'6" (168 cm)</option>
-                <option value="5'7&quot; (170 cm)">5'7" (170 cm)</option>
-                <option value="5'8&quot; (173 cm)">5'8" (173 cm)</option>
-                <option value="5'9&quot; (175 cm)">5'9" (175 cm)</option>
-                <option value="5'10&quot; (178 cm)">5'10" (178 cm)</option>
+                <option value="4'10&quot;">4'10" (147 cm)</option>
+                <option value="4'11&quot;">4'11" (150 cm)</option>
+                <option value="5'0&quot;">5'0" (152 cm)</option>
+                <option value="5'1&quot;">5'1" (155 cm)</option>
+                <option value="5'2&quot;">5'2" (157 cm)</option>
+                <option value="5'3&quot;">5'3" (160 cm)</option>
+                <option value="5'4&quot;">5'4" (163 cm)</option>
+                <option value="5'5&quot;">5'5" (165 cm)</option>
+                <option value="5'6&quot;">5'6" (168 cm)</option>
+                <option value="5'7&quot;">5'7" (170 cm)</option>
+                <option value="5'8&quot;">5'8" (173 cm)</option>
+                <option value="5'9&quot;">5'9" (175 cm)</option>
+                <option value="5'10&quot;">5'10" (178 cm)</option>
               </select>
 
               <select

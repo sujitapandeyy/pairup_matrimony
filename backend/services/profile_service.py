@@ -57,6 +57,9 @@ class ProfileService:
         if details:
             profile.update({
                 "age": details.get("age"),
+                "height": details.get("height"),
+                "caste": details.get("caste"),
+                "personality": details.get("personality"),
                 "gender": details.get("gender"),
                 "location": details.get("location"),
                 "maritalStatus": details.get("marital_status"),
@@ -83,6 +86,8 @@ class ProfileService:
         details_update = {}
         fields = {
             "age": "age",
+            "height": "height",
+            "caste": "caste",
             "gender": "gender",
             "location": "location",
             "maritalStatus": "marital_status",

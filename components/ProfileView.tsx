@@ -1,7 +1,7 @@
 'use client';
 
 import React from "react";
-import { MapPin, Heart, Edit3, Mail, Calendar, Briefcase, GraduationCap, Users, Home } from "lucide-react";
+import { MapPin, Heart, Edit3, Mail, Calendar, Briefcase, GraduationCap, Users, Home, Church, Hand, Baby } from "lucide-react";
 import { Profile } from "./types";
 
 interface ProfileViewProps {
@@ -20,10 +20,13 @@ export default function ProfileView({ profile, onEditClick }: ProfileViewProps) 
         </h3>
         <div className="space-y-4">
           <DetailItem icon={<Mail className="h-4 w-4" />} label="Email" value={profile.email} />
-          <DetailItem icon={<Calendar className="h-4 w-4" />} label="Age Group" value={profile.age ?? "N/A"} />
+          {/* <DetailItem icon={<Calendar className="h-4 w-4" />} label="Age" value={profile.age ?? "N/A"} /> */}
           <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={profile.gender ?? "N/A"} />
-          <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={profile.religion ?? "N/A"} />
+          <DetailItem icon={<Baby className="h-4 w-4" />} label="Height" value={profile.height ?? "N/A"} />
+          <DetailItem icon={<Hand className="h-4 w-4" />} label="Personality " value={profile.personality ?? "N/A"} />
           <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={profile.maritalStatus ?? "N/A"} />
+          <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={profile.religion ?? "N/A"} />
+          <DetailItem icon={<Church className="h-4 w-4" />} label="Caste " value={profile.caste ?? "N/A"} />
           {/* <DetailItem icon={<MapPin className="h-4 w-4" />} label="Location" value={profile.location ?? "N/A"} /> */}
         </div>
       </div>
@@ -39,11 +42,11 @@ export default function ProfileView({ profile, onEditClick }: ProfileViewProps) 
           <DetailItem icon={<Briefcase className="h-4 w-4" />} label="Profession" value={profile.profession ?? "N/A"} />
         </div>
         
-        {profile.personality && profile.personality.length > 0 && (
+        {profile.interest && profile.interest.length > 0 && (
           <div className="mt-6">
-            <h4 className="font-semibold text-gray-800 mb-3">Personality Traits</h4>
+            <h4 className="font-semibold text-gray-800 mb-3">Interest Traits</h4>
             <div className="flex flex-wrap gap-2">
-              {profile.personality.map((trait, index) => (
+              {profile.interest.map((trait, index) => (
                 <span key={index} className="bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium">
                   {trait}
                 </span>

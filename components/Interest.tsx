@@ -141,7 +141,8 @@ export default function Interests() {
             <option>25-30</option>
             <option>31-35</option>
             <option>36-40</option>
-            <option>40+</option>
+            <option>41-45</option>
+            <option>46+</option>
           </select>
 
           <select

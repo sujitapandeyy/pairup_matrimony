@@ -22,10 +22,13 @@ interface EditProfileProps {
 
 const genderOptions = ["Male", "Female", "Other"];
 const religionOptions = ["Hindu", "Muslim", "Christian", "Buddhist", "Sikh", "Jain", "Other"];
-const maritalStatusOptions = ["Single", "Divorced", "Widowed", "Separated"];
-const educationOptions = ["High School", "Diploma", "Bachelor's", "Master's", "PhD", "Other"];
-const professionOptions = ["Student", "Engineer", "Doctor", "Teacher", "Business", "Artist", "Other"];
-const ageGroupOptions = ["18-25", "26-35", "36-45", "46+"];
+const persionalityOptions = ["Homebody","Social Butterfly","Balanced"];
+const casteOptions = ["Brahmin", "Chhetri", "Thakuri", "Newar","Tamang","Magar","Rai","Limbu","Sherpa","Gurung","Tharu","Madhesi", "Muslim","Dalit","Other"];
+const heightOptions = ["Below 5'0\"", "5'0\" - 5'2\"", "5'3\" - 5'5\"", "5'6\" - 5'8\"", "5'9\" - 5'11\"", "Above 5'11\"", "Any"];
+const maritalStatusOptions = ["Single", "Divorced", "Widowed"];
+const educationOptions = ["High School", "Diploma", "Bachelor's", "Master's", "PhD"];
+const ageGroupOptions = ["18-24 ", "25-30","31-35","36-40","41-45","46+"];
+const familyTypeOptions = ["Joint", "Nuclear"];
 
 const lookingForOptions = {
   ageGroup: ageGroupOptions,
@@ -33,7 +36,11 @@ const lookingForOptions = {
   religion: religionOptions,
   maritalStatus: maritalStatusOptions,
   education: educationOptions,
-  profession: professionOptions,
+  persionality: persionalityOptions,
+  height: heightOptions,
+  caste: casteOptions,
+  familyType: familyTypeOptions,
+  // profession: professionOptions,
 };
 
 export default function EditProfile({
@@ -55,7 +62,6 @@ export default function EditProfile({
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
-      {/* Photo Section */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Camera className="h-6 w-6 text-blue-500" />
@@ -114,10 +120,18 @@ export default function EditProfile({
         <div className="space-y-6">
           <InputField label="Full Name" name="name" value={formData.name ?? ""} onChange={onFormChange} />
           <SelectField label="Age Group" name="age" value={formData.age ?? ""} onChange={onFormChange} options={ageGroupOptions} />
+          <SelectField label="Height" name="height" value={formData.height ?? ""} onChange={onFormChange} options={heightOptions} />
           <SelectField label="Gender" name="gender" value={formData.gender ?? ""} onChange={onFormChange} options={genderOptions} />
           <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
+          <SelectField label="Caste" name="caste" value={formData.caste ?? ""} onChange={onFormChange} options={casteOptions} />
           <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
-          
+            <TextAreaField 
+            label="About Me" 
+            name="caption" 
+            value={formData.caption ?? ""} 
+            onChange={onFormChange} 
+            placeholder="Tell us about yourself, your interests, and what you're looking for..." 
+          />
           {/* Location Autocomplete */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-gray-700">
@@ -149,14 +163,8 @@ export default function EditProfile({
         </h3>
         <div className="space-y-6">
           <SelectField label="Education" name="education" value={formData.education ?? ""} onChange={onFormChange} options={educationOptions} />
-          <SelectField label="Profession" name="profession" value={formData.profession ?? ""} onChange={onFormChange} options={professionOptions} />
-          <TextAreaField 
-            label="About Me" 
-            name="caption" 
-            value={formData.caption ?? ""} 
-            onChange={onFormChange} 
-            placeholder="Tell us about yourself, your interests, and what you're looking for..." 
-          />
+          <InputField label="Profession" name="profession" value={formData.profession ?? ""} onChange={onFormChange} />
+        
         </div>
       </div>
 
@@ -168,11 +176,14 @@ export default function EditProfile({
         </h3>
         <div className="grid md:grid-cols-2 gap-6">
           <SelectField label="Age Group" name="lookingFor.ageGroup" value={formData.lookingFor?.ageGroup ?? ""} onChange={onFormChange} options={lookingForOptions.ageGroup} />
+          <SelectField label="Height" name="lookingFor.height" value={formData.lookingFor?.height ?? ""} onChange={onFormChange} options={lookingForOptions.height} />
           <SelectField label="Gender" name="lookingFor.gender" value={formData.lookingFor?.gender ?? ""} onChange={onFormChange} options={lookingForOptions.gender} />
           <SelectField label="Religion" name="lookingFor.religion" value={formData.lookingFor?.religion ?? ""} onChange={onFormChange} options={lookingForOptions.religion} />
+          <SelectField label="Caste" name="lookingFor.caste" value={formData.lookingFor?.caste ?? ""} onChange={onFormChange} options={lookingForOptions.caste} />
           <SelectField label="Marital Status" name="lookingFor.maritalStatus" value={formData.lookingFor?.maritalStatus ?? ""} onChange={onFormChange} options={lookingForOptions.maritalStatus} />
           <SelectField label="Education" name="lookingFor.education" value={formData.lookingFor?.education ?? ""} onChange={onFormChange} options={lookingForOptions.education} />
-          <SelectField label="Profession" name="lookingFor.profession" value={formData.lookingFor?.profession ?? ""} onChange={onFormChange} options={lookingForOptions.profession} />
+          <InputField label="Profession" name="lookingFor.profession" value={formData.lookingFor?.profession ?? ""} onChange={onFormChange} />
+          <SelectField label="Partner Family Type" name="lookingFor.partner_family_type" value={formData.lookingFor?.partner_family_type ?? ""} onChange={onFormChange} options={lookingForOptions.familyType} />
         </div>
       </div>
 
