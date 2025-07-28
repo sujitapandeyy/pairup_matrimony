@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { LogIn, UserPlus, ChevronDown } from "lucide-react";
@@ -14,27 +14,38 @@ interface AuthDropdownProps {
 export const AuthDropdown = ({ onRegister, onLogin }: AuthDropdownProps) => {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      setIsOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleLogin = () => {
     setIsOpen(false);
-    onLogin?.(); // optional callback
+    onLogin?.();
     router.push("/login");
   };
 
   const handleRegister = () => {
     setIsOpen(false);
-    onRegister?.(); // optional callback
+    onRegister?.();
     router.push("/register");
   };
 
   return (
-    <div
-      className="relative"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
+    <div className="relative" ref={dropdownRef}>
       <Button
         className="bg-transparent hover:bg-white text-pink-600 px-6 py-2 text-md font-bold transition-all duration-300 flex items-center gap-2"
+        onClick={() => setIsOpen(prev => !prev)}
       >
         Get Started
         <ChevronDown

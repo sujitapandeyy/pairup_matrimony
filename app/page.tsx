@@ -3,14 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Heart,
   Users,
   MessageCircle,
   Shield,
-  Star,
-  ArrowRight,
   UserPlus,
   Search,
   Mail,
@@ -22,31 +19,8 @@ import {
   Linkedin,
 } from "lucide-react";
 import { AuthDropdown } from "@/components/AuthDropdown";
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from "next/navigation";
 
-// Placeholder Register Component
-// const RegisterComponent = ({ onBack }: { onBack: () => void }) => (
-//   <div className="min-h-screen flex items-center justify-center bg-pink-50 text-center">
-//     <div>
-//       <h2 className="text-3xl font-bold mb-4">Register</h2>
-//       <p className="mb-6">Registration form goes here...</p>
-//       <Button onClick={onBack}>Back</Button>
-//     </div>
-//   </div>
-// );
-
-// // Placeholder Login Component
-// const LoginComponent = ({ onBack }: { onBack: () => void }) => (
-//   <div className="min-h-screen flex items-center justify-center bg-purple-50 text-center">
-//     <div>
-//       <h2 className="text-3xl font-bold mb-4">Login</h2>
-//       <p className="mb-6">Login form goes here...</p>
-//       <Button onClick={onBack}>Back</Button>
-//     </div>
-//   </div>
-// );
-
-// Feature items
 const features = [
   {
     icon: Heart,
@@ -58,7 +32,7 @@ const features = [
     icon: Shield,
     title: "Safe & Secure",
     description:
-      "Every profile is verified and protected, ensuring your safety while searching for your soulmate.",
+      "Your conversations are end-to-end encrypted, ensuring private and secure communication throughout your matchmaking journey.",
   },
   {
     icon: MessageCircle,
@@ -72,13 +46,6 @@ const features = [
     description:
       "Join a large, diverse, and active community looking for serious relationships.",
   },
-];
-
-const stats = [
-  { number: "50K+", label: "Active Members" },
-  { number: "12K+", label: "Success Stories" },
-  { number: "98%", label: "Verified Profiles" },
-  { number: "4.9★", label: "User Rating" },
 ];
 
 const steps = [
@@ -106,50 +73,37 @@ const steps = [
 ];
 
 export default function HomePage() {
-      const router = useRouter();
-    
+  const router = useRouter();
+
   const [currentView, setCurrentView] = useState<
     "landing" | "register" | "swipe" | "login"
   >("landing");
-  const [user, setUser] = useState(null);
-
-  // View switching logic
-  // if (currentView === "register") {
-  //   return <RegisterComponent onBack={() => setCurrentView("landing")} />;
-  // }
-
-  // if (currentView === "login") {
-  //   return <LoginComponent onBack={() => setCurrentView("landing")} />;
-  // }
   const navigate = (page: string) => router.push(page);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-indigo-50 text-gray-800">
-      {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-rose-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-2xl font-extrabold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
               Pair-Up
             </h1>
           </div>
 
           <div className="flex items-center gap-6">
             <AuthDropdown
-  onRegister={() => setCurrentView("register")}
-  onLogin={() => setCurrentView("login")}
-/>
-
+              onRegister={() => navigate("/register")}
+              onLogin={() => navigate("/login")}
+            />
           </div>
         </div>
       </nav>
 
       {/* Hero */}
       <section className="relative h-[90vh] flex items-center justify-center bg-black overflow-hidden">
-        {/* Background Image */}
         <div className="absolute inset-0">
           <img
             src="/img/wedding-couple.png"
@@ -159,12 +113,11 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
 
-        {/* Content */}
         <div className="relative z-10 max-w-6xl mx-auto px-6 text-left flex flex-col sm:flex-row items-center sm:items-start gap-10">
-          {/* Text Block */}
           <div className="max-w-xl text-white">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
-              Find Your <span className="text-pink-400">Forever Love</span> with pair-up
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
+              Find Your <span className="text-pink-400">Soul-mate</span> with
+              pair-up
             </h1>
             <p className="text-lg text-gray-200 mb-8">
               Pair-Up connects hearts, not just profiles. Verified users,
@@ -172,7 +125,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate("/login")}
                 className="bg-white hover:bg-pink-500 hover:text-white text-gray-800 font-bold px-5 py-3 text-lg rounded-full shadow-lg transition"
               >
                 ❤️ Start Matching
@@ -180,7 +133,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Couple Illustration or Secondary Image */}
           <div className="hidden sm:block w-[350px] lg:w-[450px]">
             <img
               src="/img/couple.png"
@@ -191,7 +143,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
       <section className="bg-white py-20 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <h3 className="text-3xl font-bold text-gray-900 mb-6">
@@ -221,7 +172,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trusted Stats Section */}
       <div className="m-16 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-5 gap-8 ">
         <div className="flex items-center space-x-4 justify-center">
           <img
@@ -231,9 +181,7 @@ export default function HomePage() {
           />
           <div>
             <div className="font-bold text-lg">100%</div>
-            <div className="text-gray-600 text-sm">
-              Mobile-verified profiles
-            </div>
+            <div className="text-gray-600 text-sm">verified users</div>
           </div>
         </div>
         <div className="hidden sm:block border-l border-gray-300"></div>
@@ -244,7 +192,7 @@ export default function HomePage() {
             className="h-10 w-10"
           />
           <div>
-            <div className="font-bold text-lg">4 Crore+</div>
+            <div className="font-bold text-lg">4 thousand+</div>
             <div className="text-gray-600 text-sm">Customers served</div>
           </div>
         </div>
@@ -252,7 +200,7 @@ export default function HomePage() {
         <div className="flex items-center space-x-4 justify-center">
           <img src="/img/shield-icon.svg" alt="Shield" className="h-10 w-10" />
           <div>
-            <div className="font-bold text-lg">25 Years</div>
+            <div className="font-bold text-lg">5 Years</div>
             <div className="text-gray-600 text-sm">
               of successful matchmaking
             </div>
@@ -260,7 +208,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* How It Works */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <h3 className="text-3xl font-bold mb-4">How It Works</h3>
@@ -286,28 +233,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
       <section className=" bg-pink-50 text-red-400 ">
-        {/* <div className="absolute top-10 left-10 w-20 h-20 bg-primary-foreground/10 rounded-full animate-romantic-float"></div>
-      <div className="absolute bottom-10 right-10 w-16 h-16 bg-primary-foreground/10 rounded-full animate-bounce-gentle"></div>
-      <div className="absolute top-1/2 left-1/4 w-8 h-8 bg-primary-foreground/20 rounded-full animate-pulse"></div> */}
-
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
-          {/* Text Content */}
           <div className="flex-1 text-center md:text-left">
             <h3 className="text-4xl font-bold mb-4">Ready to Find Love?</h3>
-            <p className="text-pink-800 text-lg mb-8">
+            <p className="text-gray-800 text-lg mb-8">
               It only takes a few minutes to meet someone special.
             </p>
             <Button
-                onClick={() => navigate('/register')}
-              className="bg-white text-pink-600 hover:bg-pink-50 px-8 py-3 text-lg font-semibold rounded-full shadow-md hover:shadow-xl transition"
+              onClick={() => navigate("/register")}
+              className="bg-white text-gray-600 hover:bg-pink-50 px-8 py-3 text-lg font-semibold rounded-full shadow-md hover:shadow-xl transition"
             >
               Create Your Profile <Heart className="ml-2 h-5 w-5" />
             </Button>
           </div>
 
-          {/* Image */}
           <div className="flex-1">
             <img
               src="/img/wedding-couple.png"
@@ -318,7 +258,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-card border-t border-border">
         <div className="container mx-auto px-4 py-12">
           <div className="grid md:grid-cols-4 gap-8">
@@ -455,5 +394,4 @@ export default function HomePage() {
       </footer>
     </div>
   );
-};
-
+}
