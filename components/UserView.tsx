@@ -158,6 +158,7 @@ export default function UserView({ userId }: UserViewProps) {
           <DetailItem icon={<Mail className="h-4 w-4" />} label="Email" value={safe(profile.email)} />
           <DetailItem icon={<Calendar className="h-4 w-4" />} label="Age" value={safe(profile.age)} />
           <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={safe(profile.gender)} />
+          <DetailItem icon={<Users className="h-4 w-4" />} label="Height" value={safe(profile.height)} />
           <DetailItem icon={<Church className="h-4 w-4" />} label="Caste" value={safe(profile.caste)} />
           <DetailItem icon={<Baby className="h-4 w-4" />} label="Personality" value={safe(profile.personality)} />
           <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={safe(profile.religion)} />

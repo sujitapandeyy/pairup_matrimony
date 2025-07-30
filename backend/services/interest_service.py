@@ -23,7 +23,7 @@ class InterestService:
             "religion": data.get("partner_religion"),
             "caste": data.get("partner_caste"),
             "personality": data.get("partner_personality", []),
-            "hobbies": data.get("partner_hobbies", []),
+            # "hobbies": data.get("partner_hobbies", []),
             "pet_preference": data.get("partner_pets"),
             "education_level": data.get("partner_education"),
             "profession": data.get("partner_profession"),

@@ -16,6 +16,18 @@ def get_profiles():
     profiles = service.get_profiles(request, email)
     return jsonify(profiles), 200
 
+@match_bp.route("/get_similar_profiles", methods=["GET"])
+def get_similar_profiles():
+    print("Request args:", request.args)
+    profile_email = request.args.get("profile_email")
+    if not profile_email:
+        print("Missing profile_email in request.args")
+        return jsonify({"error": "Missing profile_email"}), 400
+
+    service = MatchAlgorithm(current_app.mongo.db)
+    result = service.get_similar_profiles_for_profile(request, profile_email)
+    return jsonify(result), 200
+
 @match_bp.route("/swipe", methods=["POST"])
 def swipe():
     data = request.get_json()
@@ -101,12 +113,12 @@ def cancel_sent_request():
     else:
         return jsonify({"error": "Request not found"}), 404
 
-def _calculate_trait_similarity(self, traits1, traits2):
-    if not traits1 or not traits2:
-        return 0
-    text1 = " ".join(traits1)
-    text2 = " ".join(traits2)
-    vectorizer = CountVectorizer().fit_transform([text1, text2])
-    vectors = vectorizer.toarray()
-    cos_sim = cosine_similarity([vectors[0]], [vectors[1]])[0][0]
-    return cos_sim
+# def _calculate_trait_similarity(self, traits1, traits2):
+#     if not traits1 or not traits2:
+#         return 0
+#     text1 = " ".join(traits1)
+#     text2 = " ".join(traits2)
+#     vectorizer = CountVectorizer().fit_transform([text1, text2])
+#     vectors = vectorizer.toarray()
+#     cos_sim = cosine_similarity([vectors[0]], [vectors[1]])[0][0]
+#     return cos_sim

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Heart, X, MapPin, Briefcase, GraduationCap, HeartHandshake } from 'lucide-react'
+import { Heart, X, MapPin, Briefcase, GraduationCap } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ const ProfileCards = () => {
   const [profiles, setProfiles] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [email, setEmail] = useState<string | null>(null)
+  const [randomProfiles, setRandomProfiles] = useState<any[]>([])
 
   useEffect(() => {
     const storedUser = localStorage.getItem('pairupUser')
@@ -33,9 +34,12 @@ const ProfileCards = () => {
     api
       .get(`/matches/get_profiles?email=${encodeURIComponent(email)}`)
       .then((res) => {
-const filteredProfiles = res.data.profiles.filter((profile: any) => profile.email !== email)
-        setProfiles(filteredProfiles)
+        const filtered = res.data.profiles.filter((p: any) => p.email !== email)
+        setProfiles(filtered)
         setCurrentIndex(0)
+
+        const shuffled = [...filtered].sort(() => 0.5 - Math.random())
+        setRandomProfiles(shuffled.slice(0, 5))
       })
       .catch(() => toast.error('Failed to fetch profiles'))
   }, [email])
@@ -45,23 +49,24 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
     const targetProfile = profiles[currentIndex]
 
     try {
-      const res = await api.post('/matches/swipe', {
+      await api.post('/matches/swipe', {
         swiper_email: email,
         target_email: targetProfile.email,
         liked,
       })
 
-      if (res.status < 200 || res.status >= 300) {
-        toast.error('Failed to send request')
-        return
-      }
+      liked ? toast.success('Interest sent!') : toast.info('Skipped.')
 
-      liked ? toast.success('Interest Request sent!') : toast.info('Not Interested!')
-
-      setProfiles((prev) => prev.filter((_, idx) => idx !== currentIndex))
-      setCurrentIndex((prev) => (prev >= profiles.length - 1 ? 0 : prev))
+      setProfiles((prev) => {
+        const updated = prev.filter((_, idx) => idx !== currentIndex)
+        const newIndex = currentIndex >= updated.length ? 0 : currentIndex
+        setCurrentIndex(newIndex)
+        const shuffled = [...updated].sort(() => 0.5 - Math.random())
+        setRandomProfiles(shuffled.slice(0, 5))
+        return updated
+      })
     } catch {
-      toast.error('Failed to store swipe')
+      toast.error('Swipe failed')
     }
   }
 
@@ -70,29 +75,36 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
 
   const currentProfile = profiles[currentIndex]
 
-  const onImageClick = () => {
-    if (currentProfile?.id) {
-          const scrollPosition = window.scrollY || document.documentElement.scrollTop;
-    router.push(`/user/${currentProfile.id}?from=${encodeURIComponent(window.location.pathname)}&index=${currentIndex}&scroll=${scrollPosition}`);
-
-      // router.push(`/user/${currentProfile.id}`)
+  const onSmallCardClick = (profile: any) => {
+    const idx = profiles.findIndex((p) => p.email === profile.email)
+    if (idx !== -1) {
+      setCurrentIndex(idx)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      toast.error('User ID not found!')
+      toast.error('Profile not found')
+    }
+  }
+
+  const onBigImageClick = () => {
+    if (currentProfile?.id) {
+      router.push(`/user/${currentProfile.id}`)
+    } else {
+      toast.error('User ID not found')
     }
   }
 
   return (
-    <div className="flex justify-center">
-      <div className="w-full max-w-sm">
-        <Card className="overflow-hidden shadow-2xl border-0 bg-white rounded-3xl transform transition-all duration-300 hover:scale-105">
+    <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto">
+      {/* Main Profile Section */}
+      <div className="flex-1 flex justify-center">
+        <Card className="w-3/5 max-w-5xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
           <div
             className="relative cursor-pointer"
-            onClick={onImageClick}
-            aria-label={`View profile of ${currentProfile.name}`}
+            onClick={onBigImageClick}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') onImageClick()
+              if (e.key === 'Enter' || e.key === ' ') onBigImageClick()
             }}
           >
             <img
@@ -101,61 +113,53 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
               className="w-full h-96 object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none">
               <h2 className="text-3xl font-bold mb-2">
                 {currentProfile.name}, {currentProfile.age}
               </h2>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span><span className="text-sm">{currentProfile.distance_km} km</span>
-
+                  <span>{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span>
+                  <span>{currentProfile.distance_km} km</span>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <Briefcase className="w-4 h-4" />
-                  <span className="text-sm">{currentProfile.profession}</span>
+                  <span>{currentProfile.profession}</span>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <GraduationCap className="w-4 h-4" />
-                  <span className="text-sm">{currentProfile.education}</span>
+                  <span>{currentProfile.education}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Badge
-                                  className={`text-xs px-2 py-1 text-white ${
-                                    currentProfile.compatibility_score >= 90
-                                      ? 'bg-green-700'
-                                      : currentProfile.compatibility_score >= 80
-                                      ? 'bg-green-600'
-                                      : currentProfile.compatibility_score >= 70
-                                      ? 'bg-green-500'
-                                      : currentProfile.compatibility_score >= 60
-                                      ? 'bg-yellow-500'
-                                      : currentProfile.compatibility_score >= 50
-                                      ? 'bg-yellow-400'
-                                      : currentProfile.compatibility_score >= 40
-                                      ? 'bg-orange-400'
-                                      : currentProfile.compatibility_score >= 30
-                                      ? 'bg-orange-500'
-                                      : currentProfile.compatibility_score >= 20
-                                      ? 'bg-red-500'
-                                      : 'bg-red-600'
-                                  }`}
-                                >
-                                  {currentProfile.compatibility_score}% Compatible
-                                </Badge>
-                 
-
-              </div>
-
-                {/* <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4" />
-                  <span className="text-sm">{currentProfile.distance_km} km</span>
-                </div> */}
+                    className={`text-xs px-2 py-1 text-white ${
+                      currentProfile.compatibility_score >= 90
+                        ? 'bg-green-700'
+                        : currentProfile.compatibility_score >= 80
+                        ? 'bg-green-600'
+                        : currentProfile.compatibility_score >= 70
+                        ? 'bg-green-500'
+                        : currentProfile.compatibility_score >= 60
+                        ? 'bg-yellow-500'
+                        : currentProfile.compatibility_score >= 50
+                        ? 'bg-yellow-400'
+                        : currentProfile.compatibility_score >= 40
+                        ? 'bg-orange-400'
+                        : currentProfile.compatibility_score >= 30
+                        ? 'bg-orange-500'
+                        : currentProfile.compatibility_score >= 20
+                        ? 'bg-red-500'
+                        : 'bg-red-600'
+                    }`}
+                  >
+                    {currentProfile.compatibility_score}% Compatible
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
-          <CardContent className="p-6 pointer-events-none">
+          <CardContent className="p-6">
             <p className="text-gray-700 mb-4 leading-relaxed">
               {currentProfile.bio || currentProfile.caption || ''}
             </p>
@@ -164,48 +168,72 @@ const filteredProfiles = res.data.profiles.filter((profile: any) => profile.emai
               <div className="mt-4 mb-6">
                 <h3 className="font-semibold text-gray-800 mb-2">Hobbies</h3>
                 <div className="flex flex-wrap gap-2">
-                  {currentProfile.hobbies.map((trait: string, index: number) => (
+                  {currentProfile.hobbies.map((hobby: string, i: number) => (
                     <span
-                      key={index}
-                      className="bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium"
+                      key={i}
+                      className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium"
                     >
-                      {trait}
+                      {hobby}
                     </span>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="flex justify-center space-x-4 pointer-events-auto">
+            <div className="flex justify-center gap-6 mt-4">
               <Button
                 onClick={async (e) => {
                   e.preventDefault()
-                  e.stopPropagation()
-                  e.nativeEvent.stopImmediatePropagation()
                   await handleSwipe(false)
                 }}
                 variant="outline"
-                size="lg"
-                className="w-16 h-16 rounded-full border-2 border-gray-300 hover:border-red-400 hover:bg-red-50"
+                className="w-14 h-14 rounded-full border-gray-300 hover:border-red-500"
               >
-                <X className="w-8 h-8 text-gray-500 hover:text-red-500" />
+                <X className="w-6 h-6 text-red-500" />
               </Button>
 
               <Button
                 onClick={async (e) => {
                   e.preventDefault()
-                  e.stopPropagation()
-                  e.nativeEvent.stopImmediatePropagation()
                   await handleSwipe(true)
                 }}
-                size="lg"
-                className="w-16 h-16 rounded-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-lg hover:scale-110"
+                className="w-14 h-14 rounded-full bg-pink-500 hover:bg-pink-600 text-white"
               >
-                <Heart className="w-8 h-8 text-white" />
+                <Heart className="w-6 h-6" />
               </Button>
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Similar Users */}
+      <div className="w-full lg:w-[210px] space-y-6">
+        {randomProfiles.map((profile) => (
+          <div
+            key={profile.email}
+            className={`cursor-pointer rounded-lg overflow-hidden shadow-md hover:shadow-lg transition bg-white flex items-center gap-4 p-3 ${
+              profiles[currentIndex]?.email === profile.email ? 'ring-2 ring-gray-500' : ''
+            }`}
+            onClick={() => onSmallCardClick(profile)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') onSmallCardClick(profile)
+            }}
+          >
+            <img
+              src={profile.images?.[0] || '/default-profile.jpg'}
+              alt={profile.name}
+              className="w-16 h-16 object-cover rounded-lg"
+            />
+            <div className="flex flex-col">
+              <h3 className="font-semibold text-base">{profile.name}</h3>
+              <p className="text-xs text-gray-600">
+                {profile.age} &middot; {(profile.location || 'Unknown').split(' ').slice(0, 2).join(' ')}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

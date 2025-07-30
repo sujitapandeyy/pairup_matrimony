@@ -16,7 +16,7 @@ const defaultForm = {
   partner_religion: "",
   partner_caste: "",
   partner_personality: "",
-  partner_hobbies: [] as string[],
+  // partner_hobbies: [] as string[],
   partner_pets: "",
   partner_education: "",
   partner_profession: "",
@@ -45,7 +45,7 @@ export default function Interests() {
     field: keyof typeof defaultForm,
     value: string
   ) => {
-    const selected = formData[field] as string[];
+    const selected = Array.isArray(formData[field]) ? (formData[field] as string[]) : [];
     const updated = selected.includes(value)
       ? selected.filter((v) => v !== value)
       : [...selected, value];
@@ -63,7 +63,7 @@ export default function Interests() {
       1: [
         "partner_religion",
         "partner_personality",
-        "partner_hobbies",
+        // "partner_hobbies",
         "partner_pets",
       ],
       2: [
@@ -253,8 +253,8 @@ export default function Interests() {
           >
             <option value="">Pets Preference</option>
             <option>Love Them</option>
-            <option>Neutral</option>
-            <option>Can't Live With</option>
+            {/* <option>Neutral</option> */}
+            <option>Usually don't prefer</option>
           </select>
           <select
             className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
@@ -269,8 +269,8 @@ export default function Interests() {
             <option value="Balanced">Balanced</option>
             <option value="Any">Any</option>
           </select>
-          <p className="font-semibold mt-4 mb-1">Hobbies:</p>
-          {[
+          {/* <p className="font-semibold mt-4 mb-1">Hobbies:</p> */}
+          {/* {[
             "Traveling",
             "Cooking",
             "Reading",
@@ -300,7 +300,7 @@ export default function Interests() {
               />{" "}
               {hobby}
             </label>
-          ))}
+          ))} */}
         </>
       ),
     },
@@ -390,8 +390,8 @@ export default function Interests() {
           >
             <option value="">Open to Long Distance?</option>
             <option>Yes</option>
-            <option>Maybe</option>
-            <option>No</option>
+            <option>Usually don't prefer</option>
+            {/* <option>No</option> */}
           </select>
         </>
       ),
