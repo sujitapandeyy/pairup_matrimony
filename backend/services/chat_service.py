@@ -1,5 +1,6 @@
-from flask import current_app, jsonify
+from flask import current_app, jsonify 
 from datetime import datetime
+from utils.encryption import decrypt_message
 
 class ChatService:
 
@@ -13,10 +14,18 @@ class ChatService:
             except Exception:
                 ts_iso = datetime.utcnow().isoformat()
 
+        encrypted_msg = msg.get('message', '')
+        try:
+            # Decrypt message before returning
+            decrypted_msg = decrypt_message(encrypted_msg)
+        except Exception as e:
+            # If decryption fails, fallback to raw message
+            decrypted_msg = encrypted_msg
+
         return {
             'sender': msg.get('sender', ''),
             'receiver': msg.get('receiver', ''),
-            'message': msg.get('message', ''),
+            'message': decrypted_msg,
             'timestamp': ts_iso,
         }
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, X, MessageCircle, MapPin, Briefcase, GraduationCap } from 'lucide-react'
+import { Heart, X, MessageCircle, MapPin, Briefcase, GraduationCap, Badge } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -174,6 +174,32 @@ const Requests = () => {
                     <span>{currentRequest.sender_education}</span>
                   </div>
                 )}
+
+                <div className="flex items-center space-x-2">
+                  <Badge
+                    className={`text-xs px-2 py-1 text-white ${
+                      currentRequest.compatibility_score >= 90
+                        ? 'bg-green-700'
+                        : currentRequest.compatibility_score >= 80
+                        ? 'bg-green-600'
+                        : currentRequest.compatibility_score >= 70
+                        ? 'bg-green-500'
+                        : currentRequest.compatibility_score >= 60
+                        ? 'bg-yellow-500'
+                        : currentRequest.compatibility_score >= 50
+                        ? 'bg-yellow-400'
+                        : currentRequest.compatibility_score >= 40
+                        ? 'bg-orange-400'
+                        : currentRequest.compatibility_score >= 30
+                        ? 'bg-orange-500'
+                        : currentRequest.compatibility_score >= 20
+                        ? 'bg-red-500'
+                        : 'bg-red-600'
+                    }`}
+                  >
+                    {currentRequest.compatibility_score}% Compatible
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>

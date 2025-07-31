@@ -153,6 +153,7 @@ class MatchService:
                     n["sender_education"] = detail.get("education")
                     n["sender_hobbies"] = detail.get("hobbies", [])
                     n["sender_caption"] = detail.get("caption", "")
+                    n["compatibility_score"] = detail.get("compatibility_score", "0")
         return notes
 
     def mark_read(self, notification_id):
