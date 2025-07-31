@@ -67,7 +67,7 @@ class MatchService:
                 "profession": detail.get("profession"),
                 "education": detail.get("education"),
                 "bio": detail.get("caption", "No bio available."),
-                "personality": detail.get("personality", []),
+                "hobbies": detail.get("hobbies", []),
                 "images": [photo_url],
                 "is_match": email in liked_by_emails
             })
@@ -142,6 +142,7 @@ class MatchService:
             sender = self.users.find_one({"email": n["from"]})
             if sender:
                 n["sender_name"] = sender.get("name")
+                n["sender_id"] = str(sender["_id"])  
                 n["sender_image"] = self.build_photo_url(request, sender.get("photo"))
 
                 detail = self.details.find_one({"user_id": sender["_id"]})
@@ -150,7 +151,7 @@ class MatchService:
                     n["sender_location"] = detail.get("location")
                     n["sender_profession"] = detail.get("profession")
                     n["sender_education"] = detail.get("education")
-                    n["sender_personality"] = detail.get("personality", [])
+                    n["sender_hobbies"] = detail.get("hobbies", [])
                     n["sender_caption"] = detail.get("caption", "")
         return notes
 

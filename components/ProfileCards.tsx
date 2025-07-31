@@ -97,7 +97,7 @@ const ProfileCards = () => {
     <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto">
       {/* Main Profile Section */}
       <div className="flex-1 flex justify-center">
-        <Card className="w-3/5 max-w-5xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
+        <Card className="w-2/7 max-w-5xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
           <div
             className="relative cursor-pointer"
             onClick={onBigImageClick}

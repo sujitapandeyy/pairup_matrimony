@@ -20,7 +20,7 @@ class MatchAlgorithm:
 
         logged_in_user = self._build_user_profile(request, user, user_detail, user_interests_list)
         partner_gender_pref = self._get_gender_preference(user_interests)
-        liked_emails, liked_by_emails = self._get_swipe_data(current_email)
+        swiped_emails_by_user, swiped_emails_on_user = self._get_swipe_data(current_email)
         user_location = self._get_location(user_detail)
 
         profiles = []
@@ -30,7 +30,7 @@ class MatchAlgorithm:
 
             candidate_profile = self._process_candidate(
                 request, candidate, partner_gender_pref,
-                liked_emails, liked_by_emails,
+                swiped_emails_by_user, swiped_emails_on_user,
                 user_detail, user_interests_list,
                 user_location
             )
@@ -151,9 +151,10 @@ class MatchAlgorithm:
         return "any"
 
     def _get_swipe_data(self, current_email):
-        liked_emails = {s["target"] for s in self.swipes.find({"swiper": current_email, "liked": True})}
-        liked_by_emails = {s["swiper"] for s in self.swipes.find({"target": current_email, "liked": True})}
-        return liked_emails, liked_by_emails
+        swiped_by_user = {s["target"] for s in self.swipes.find({"swiper": current_email})}
+        swiped_on_user = {s["swiper"] for s in self.swipes.find({"target": current_email})}
+        return swiped_by_user, swiped_on_user
+
 
     def _get_location(self, user_detail):
         if not user_detail:
@@ -182,8 +183,9 @@ class MatchAlgorithm:
 
     def _process_candidate(self, request, candidate, partner_gender_pref, liked_emails, liked_by_emails, user_detail, user_interests_list, user_location):
         email = candidate.get("email")
-        if email in liked_emails:
+        if email in liked_emails or email in liked_by_emails:
             return None
+
 
         detail = self._get_document(self.details, candidate["_id"])
         if not detail:
