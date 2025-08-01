@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Badge } from './ui/badge'
-import { url } from 'inspector'
 
 const ProfileCards = () => {
   const router = useRouter()
@@ -33,23 +32,37 @@ const ProfileCards = () => {
     if (!email) return
 
     try {
+      // Fetch all available profiles first
       const res = await api.get(`/matches/get_profiles?email=${encodeURIComponent(email)}`)
-      const filtered = res.data.profiles.filter((p: any) => p.email !== email)
-      setProfiles(filtered)
+      const allProfiles = res.data.profiles.filter((p: any) => p.email !== email)
+      setProfiles(allProfiles)
       setCurrentIndex(0)
 
       try {
+        // Fetch similar profiles
         const simRes = await api.get(`/matches/similar_to_liked?email=${encodeURIComponent(email)}`)
-        const similar = simRes.data
-        if (similar && similar.length > 0) {
-          setRandomProfiles(similar)
-        } else {
-          const fallback = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 5)
-          setRandomProfiles(fallback)
+        let similar = simRes.data || []
+        
+        // If we don't have enough similar profiles, fill with random ones
+        if (similar.length < 5) {
+          const remaining = 5 - similar.length
+          // Get random profiles that aren't already in the similar list
+          const availableProfiles = allProfiles.filter(
+            p => !similar.some(s => s.email === p.email)
+          )
+          const random = [...availableProfiles]
+            .sort(() => 0.5 - Math.random())
+            .slice(0, remaining)
+          similar = [...similar, ...random]
         }
+        
+        setRandomProfiles(similar.slice(0, 5)) // Ensure we always have 5
       } catch {
-        const fallback = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 5)
-        setRandomProfiles(fallback)
+        // Fallback to random profiles if similar fetch fails
+        const random = [...allProfiles]
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 5)
+        setRandomProfiles(random)
       }
     } catch {
       toast.error('Failed to fetch profiles')
@@ -63,57 +76,53 @@ const ProfileCards = () => {
   }, [email])
 
   const handleSwipe = async (liked: boolean): Promise<void> => {
-  if (profiles.length === 0) return
-  const targetProfile = profiles[currentIndex]
+    if (profiles.length === 0) return
+    const targetProfile = profiles[currentIndex]
 
-  try {
-    await api.post('/matches/swipe', {
-      swiper_email: email,
-      target_email: targetProfile.email,
-      liked,
-    })
+    try {
+      await api.post('/matches/swipe', {
+        swiper_email: email,
+        target_email: targetProfile.email,
+        liked,
+      })
 
-    liked ? toast.success('Interest sent!') : toast.info('Skipped.')
+      liked ? toast.success('Interest sent!') : toast.info('Skipped.')
 
-    setProfiles((prev) => {
-      const updated = prev.filter((_, idx) => idx !== currentIndex)
-      const newIndex = currentIndex >= updated.length ? 0 : currentIndex
-      setCurrentIndex(newIndex)
-      return updated
-    })
-
-    if (liked) {
-      await fetchSimilarProfiles() // refresh similar profiles after like
-    } else {
-      // Remove crossed profile immediately from similar users sidebar
-      setRandomProfiles((prev) => {
-        let updated = prev.filter((profile) => profile.email !== targetProfile.email)
-
-        // Fill to 5 if possible
-        if (updated.length < 5) {
-          // Get emails already shown to avoid duplicates
-          const shownEmails = new Set(updated.map((p) => p.email))
-          shownEmails.add(targetProfile.email) // exclude crossed too
-
-          // Find candidates from main profiles excluding shown & crossed
-          const candidatesToAdd = profiles.filter(
-            (p) => !shownEmails.has(p.email)
-          )
-
-          // Add up to fill 5
-          updated = [...updated, ...candidatesToAdd.slice(0, 5 - updated.length)]
-        }
-
+      setProfiles((prev) => {
+        const updated = prev.filter((_, idx) => idx !== currentIndex)
+        const newIndex = currentIndex >= updated.length ? 0 : currentIndex
+        setCurrentIndex(newIndex)
         return updated
       })
+
+      if (liked) {
+        await fetchSimilarProfiles()
+      } else {
+        setRandomProfiles((prev) => {
+          let updated = prev.filter((profile) => profile.email !== targetProfile.email)
+
+          // Fill to 5 if possible
+          if (updated.length < 5) {
+            const shownEmails = new Set([
+              ...updated.map((p) => p.email),
+              targetProfile.email
+            ])
+            
+            const candidatesToAdd = profiles
+              .filter(p => !shownEmails.has(p.email))
+              .sort(() => 0.5 - Math.random())
+              .slice(0, 5 - updated.length)
+
+            updated = [...updated, ...candidatesToAdd]
+          }
+
+          return updated.slice(0, 5) // Ensure we maintain 5
+        })
+      }
+    } catch {
+      toast.error('Swipe failed')
     }
-
-  } catch {
-    toast.error('Swipe failed')
   }
-}
-
-
 
   if (!email) return <div className="text-center py-10">Loading user...</div>
   if (profiles.length === 0) return <div className="text-center py-10">No profiles found.</div>
@@ -126,15 +135,18 @@ const ProfileCards = () => {
       setCurrentIndex(idx)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      toast.error('Profile not found')
+      // If profile not found in main list, add it temporarily
+      setProfiles(prev => [...prev, profile])
+      setCurrentIndex(profiles.length)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
   const onBigImageClick = () => {
-    if (currentProfile?.id) {
-      router.push(`/user/${currentProfile.id}`)
+    if (currentProfile?.id || currentProfile?.email) {
+      router.push(`/user/${currentProfile.id || currentProfile.email}`)
     } else {
-      toast.error('User ID not found')
+      toast.error('User identifier not found')
     }
   }
 

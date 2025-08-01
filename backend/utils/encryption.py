@@ -2,7 +2,7 @@ import os
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 
-load_dotenv()  # Load .env if present
+load_dotenv()
 
 FERNET_KEY = os.getenv("FERNET_KEY")
 

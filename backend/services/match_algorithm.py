@@ -72,6 +72,7 @@ class MatchAlgorithm:
             )
 
             if profile:
+                # profile["id"] = str(other["_id"])  # Add this line
                 similar_profiles.append(profile)
 
         similar_profiles.sort(key=lambda x: -(x.get("compatibility_score") or 0))
@@ -463,29 +464,34 @@ class MatchAlgorithm:
 
         total_weight += 10
 
-        # --- Long-Distance Compatibility (Up to 10 points, distance-sensitive) ---
+       # --- Long-Distance Compatibility (Up to 10 points, distance-sensitive) ---
         try:
-            if user_detail and candidate_detail:
-                # Get user's long-distance preference from interests
-                interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
-                prefers_long_distance = False
-                if interests_doc:
-                    looking_for = interests_doc.get("looking_for", {})
-                    long_distance_pref = str(looking_for.get("long_distance", "")).strip().lower()
-                    prefers_long_distance = long_distance_pref in ["yes", "true", "1"]
-                if prefers_long_distance:
-                    score += 10
-                else:
+                if user_detail and candidate_detail:
+                    interests_doc = self._get_document(
+                        self.interests, user_detail.get("user_id") or user_detail.get("_id")
+                    )
+                    prefers_long_distance = False
+                    if interests_doc:
+                        looking_for = interests_doc.get("looking_for", {})
+                        long_distance_pref = str(looking_for.get("long_distance", "")).strip().lower()
+                        prefers_long_distance = long_distance_pref in ["yes", "true", "1"]
+
+                    if prefers_long_distance:
+                        score += 10
+                    else:
                         if distance_km <= 50:
                             score += 10
-                        if distance_km <= 1000:
-                            penalty_percent = distance_km / 950 
+                        elif distance_km <= 1000:
+                            # Partial score decreasing from 10 to 0 as distance increases from 50 to 1000
+                            penalty_percent = (distance_km - 50) / 950  # normalized
                             score += round(10 * (1 - penalty_percent), 2)
                         else:
-                            score += 0 
+                            score += 0
         except Exception as e:
-            print("LONG DISTANCE MATCH ERROR:", e)
+                print("LONG DISTANCE MATCH ERROR:", e)
+
         total_weight += 10
+
 
         try:
             if user_detail and candidate_detail:

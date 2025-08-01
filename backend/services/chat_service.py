@@ -16,10 +16,8 @@ class ChatService:
 
         encrypted_msg = msg.get('message', '')
         try:
-            # Decrypt message before returning
             decrypted_msg = decrypt_message(encrypted_msg)
         except Exception as e:
-            # If decryption fails, fallback to raw message
             decrypted_msg = encrypted_msg
 
         return {
