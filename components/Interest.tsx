@@ -14,9 +14,7 @@ const defaultForm = {
   partner_height: "",
   partner_marital_status: "",
   partner_religion: "",
-  partner_caste: "",
-  partner_personality: "",
-  // partner_hobbies: [] as string[],
+  partner_caste: [] as string[],  partner_personality: "",
   partner_pets: "",
   partner_education: "",
   partner_profession: "",
@@ -25,6 +23,10 @@ const defaultForm = {
   partner_living_pref: "",
   partner_long_distance: "",
 };
+const casteOptions = [
+  "Brahmin", "Chhetri", "Thakuri", "Newar", "Tamang", "Magar", "Rai",
+  "Limbu", "Sherpa", "Gurung", "Tharu", "Madhesi", "Muslim", "Dalit", "Other", "Any"
+];
 
 export default function Interests() {
   const router = useRouter();
@@ -63,7 +65,6 @@ export default function Interests() {
       1: [
         "partner_religion",
         "partner_personality",
-        // "partner_hobbies",
         "partner_pets",
       ],
       2: [
@@ -85,6 +86,8 @@ export default function Interests() {
     });
 
     if (missing.length > 0) {
+        console.warn("Missing fields:", missing);
+
       toast.error("Please fill all required fields before proceeding.");
       return false;
     }
@@ -155,7 +158,6 @@ export default function Interests() {
             <option value="">Preferred Gender</option>
             <option>Male</option>
             <option>Female</option>
-            {/* <option>Other</option> */}
             <option>Any</option>
           </select>
 
@@ -218,31 +220,46 @@ export default function Interests() {
                 <option value="Other">Other</option>
             <option value="Any">Any</option>
           </select>
-          <select
-            className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
-            value={formData.partner_caste}
-            onChange={(e) =>
-              setFormData({ ...formData, partner_caste: e.target.value })
-            }
-          >
-            <option value="">Prefered Caste</option>
-            <option value="Brahmin">Brahmin</option>
-                <option value="Chhetri">Chhetri</option>
-                <option value="Thakuri">Thakuri</option>
-                <option value="Newar">Newar</option>
-                <option value="Tamang">Tamang</option>
-                <option value="Magar">Magar</option>
-                <option value="Rai">Rai</option>
-                <option value="Limbu">Limbu</option>
-                <option value="Sherpa">Sherpa</option>
-                <option value="Gurung">Gurung</option>
-                <option value="Tharu">Tharu</option>
-                <option value="Madhesi">Madhesi</option>
-                <option value="Muslim">Muslim</option>
-                <option value="Dalit">Dalit</option>
-                <option value="Other">Other</option>
-            <option value="Any">Any</option>
-          </select>
+<div className="w-full mb-3 p-4 border border-gray-400 rounded-xl text-gray-700">
+  <label className="block font-semibold mb-2">Preferred Castes</label>
+
+  <div className="flex flex-wrap gap-3 max-h-60 overflow-y-auto">
+    {/* Select All */}
+    <label className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={formData.partner_caste.length === casteOptions.length}
+        onChange={(e) => {
+          if (e.target.checked) {
+            setFormData({ ...formData, partner_caste: casteOptions });
+          } else {
+            setFormData({ ...formData, partner_caste: [] });
+          }
+        }}
+      />
+      <span className="text-sm">Select All</span>
+    </label>
+
+    {casteOptions.map((caste) => (
+      <label key={caste} className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          value={caste}
+          checked={formData.partner_caste.includes(caste)}
+          onChange={(e) => {
+            const selected = formData.partner_caste.includes(caste)
+              ? formData.partner_caste.filter((c) => c !== caste)
+              : [...formData.partner_caste, caste];
+
+            setFormData({ ...formData, partner_caste: selected });
+          }}
+        />
+        <span className="text-sm">{caste}</span>
+      </label>
+    ))}
+  </div>
+</div>
+
 
           <select
             className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
@@ -269,38 +286,6 @@ export default function Interests() {
             <option value="Balanced">Balanced</option>
             <option value="Any">Any</option>
           </select>
-          {/* <p className="font-semibold mt-4 mb-1">Hobbies:</p> */}
-          {/* {[
-            "Traveling",
-            "Cooking",
-            "Reading",
-            "Music",
-            "Fitness",
-            "Pets",
-            "Movies",
-            "Art",
-            "Photography",
-            "Gardening",
-            "Volunteering",
-            "Technology",
-            "Writing",
-            "Dancing",
-            "Spirituality",
-            "Gaming",
-            "Adventure Sports",
-            "Fashion",
-            "Blogging",
-            "Languages",
-          ].map((hobby) => (
-            <label key={hobby} className="block mb-1">
-              <input
-                type="checkbox"
-                checked={formData.partner_hobbies.includes(hobby)}
-                onChange={() => toggleMultiSelect("partner_hobbies", hobby)}
-              />{" "}
-              {hobby}
-            </label>
-          ))} */}
         </>
       ),
     },

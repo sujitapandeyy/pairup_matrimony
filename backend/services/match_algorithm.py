@@ -46,7 +46,6 @@ class MatchAlgorithm:
         }
         
 
-    # match_algorithm.py
     def get_similar_profiles_for_profile(self, request, profile_email):
         profile_user = self.users.find_one({"email": profile_email})
         if not profile_user:
@@ -84,7 +83,7 @@ class MatchAlgorithm:
         return collection.find_one({"user_id": user_id}) or collection.find_one({"user_id": str(user_id)})
 
     def _get_interests_list(self, interests_doc, details_doc):
-        """Extracts a clean list of interests, hobbies, and personality traits"""
+        # """Extracts a clean list of interests, hobbies, and personality traits"""
         interests = []
 
         def extend_clean(data):
@@ -155,7 +154,6 @@ class MatchAlgorithm:
         swiped_on_user = {s["swiper"] for s in self.swipes.find({"target": current_email})}
         return swiped_by_user, swiped_on_user
 
-
     def _get_location(self, user_detail):
         if not user_detail:
             return None
@@ -186,35 +184,35 @@ class MatchAlgorithm:
         if email in liked_emails or email in liked_by_emails:
             return None
 
-
         detail = self._get_document(self.details, candidate["_id"])
         if not detail:
             return None
 
-        # Gender filtering (already there)
         candidate_gender = str(detail.get("gender", "")).strip().lower()
         if partner_gender_pref != "any":
             preferred_genders = [g.strip() for g in partner_gender_pref.split(",")]
             if candidate_gender not in preferred_genders:
                 return None
 
-        # *** Add caste filtering here ***
-        # user_looking_for = {}
-        # raw_interests = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
-        # if raw_interests and isinstance(raw_interests.get("looking_for"), dict):
-        #     user_looking_for = raw_interests.get("looking_for", {})
+        user_looking_for = {}
+        raw_interests = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
+        if raw_interests and isinstance(raw_interests.get("looking_for"), dict):
+            user_looking_for = raw_interests.get("looking_for", {})
 
-        # preferred_castes = []
-        # caste_pref = user_looking_for.get("caste")
-        # if caste_pref:
-        #     if isinstance(caste_pref, list):
-        #         preferred_castes = [c.lower() for c in caste_pref]
-        #     else:
-        #         preferred_castes = [str(caste_pref).lower()]
+        preferred_castes = []
+        caste_pref = user_looking_for.get("caste")
 
-        # candidate_caste = str(detail.get("caste", "")).lower()
-        # if preferred_castes and candidate_caste not in preferred_castes:
-        #     return None
+        if caste_pref:
+            if isinstance(caste_pref, list):
+                preferred_castes = [c.lower().strip() for c in caste_pref if isinstance(c, str)]
+            elif isinstance(caste_pref, str):
+                preferred_castes = [c.lower().strip() for c in caste_pref.split(',') if c.strip()]
+
+        candidate_caste = str(detail.get("caste", "")).lower().strip()
+        if preferred_castes:
+            if candidate_caste not in preferred_castes:
+                return None
+
 
         candidate_interests = self._get_document(self.interests, candidate["_id"])
         candidate_interests_list = self._get_interests_list(candidate_interests, detail)
@@ -297,16 +295,12 @@ class MatchAlgorithm:
         score = 0
         total_weight = 0
 
-        # Age compatibility (10 points)
-        # Bidirectional Age Compatibility (10 points total: 5 + 5)
         age_points = 0
 
         try:
             user_age = user_detail.get("age")
             candidate_age = candidate_detail.get("age")
-            # print("user_detail:", user_detail)
 
-            # 1. Candidate's age within user's preferred range (5 points)
             interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
             user_pref_age = None
             if interests_doc:
@@ -320,9 +314,6 @@ class MatchAlgorithm:
                         age_points += 5
                 except ValueError:
                     pass
-
-
-            # 2. User's age within candidate's preferred range (5 points)
             candidate_interests_doc = self._get_document(self.interests, candidate_detail.get("user_id") or candidate_detail.get("_id"))
             if candidate_interests_doc and isinstance(candidate_interests_doc.get("looking_for"), dict):
                 cand_pref_age = candidate_interests_doc["looking_for"].get("age_group")
@@ -332,18 +323,13 @@ class MatchAlgorithm:
                         age_points += 5
         except:
             pass
-
         score += age_points
         total_weight += 10
 
 
-        # # --- Religion Compatibility (10 points) ---
         try:
             if user_detail and candidate_detail:
-                user_religion = str(user_detail.get("religion", "")).strip().lower()
                 candidate_religion = str(candidate_detail.get("religion", "")).strip().lower()
-          
-                # Get user religion preferences from interests 'looking_for'
                 interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
                 user_religion_pref = []
                 if interests_doc:
@@ -355,7 +341,6 @@ class MatchAlgorithm:
                         else:
                             user_religion_pref = [str(religion_pref).strip().lower()]
 
-                # Allow 'any' to mean all religions are accepted
                 religion_matches_pref = (
                     not user_religion_pref or 
                     "any" in user_religion_pref or 
@@ -368,14 +353,12 @@ class MatchAlgorithm:
             print("RELIGION MATCH ERROR:", e)
 
         total_weight += 10
-        # # --- education_level Compatibility (10 points) ---
         try:
             if user_detail and candidate_detail:
                 user_education_level = str(user_detail.get("education_level") or user_detail.get("education") or "").strip().lower()
                 candidate_education_level = str(candidate_detail.get("education_level") or candidate_detail.get("education") or "").strip().lower()
 
           
-                # Get user education_level preferences from interests 'looking_for'
                 interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
                 user_education_level_pref = []
                 if interests_doc:
@@ -387,7 +370,6 @@ class MatchAlgorithm:
                         else:
                             user_education_level_pref = [str(education_level_pref).strip().lower()]
 
-                # Allow 'any' to mean all education_levels are accepted
                 education_level_matches_pref = (
                     not user_education_level_pref or 
                     "any" in user_education_level_pref or 
@@ -406,7 +388,6 @@ class MatchAlgorithm:
             if user_detail and candidate_detail:
                 candidate_profession = str(candidate_detail.get("profession", "")).strip().lower()
 
-                # Get user profession preferences from interests 'looking_for'
                 interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
                 user_profession_pref = []
                 if interests_doc:
@@ -418,13 +399,11 @@ class MatchAlgorithm:
                         else:
                             user_profession_pref = [str(profession_pref).strip().lower()]
 
-                # Check if candidate profession matches user preference (or no preference)
                 profession_matches_pref = (not user_profession_pref) or (candidate_profession in user_profession_pref)
 
                 if profession_matches_pref and candidate_profession == candidate_detail.get("profession", "").strip().lower():
                     score += 5
         except Exception as e:
-            # optionally log the exception
             pass
 
         total_weight += 5
@@ -458,10 +437,8 @@ class MatchAlgorithm:
 # --- Marital Status Compatibility (10 points) ---
         try:
             if user_detail and candidate_detail:
-                user_marital_status = str(user_detail.get("marital_status", "")).strip().lower()
                 candidate_marital_status = str(candidate_detail.get("marital_status", "")).strip().lower()
                 
-                # Get user marital status preferences from interests 'looking_for'
                 interests_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
                 user_marital_pref = []
                 if interests_doc:
@@ -473,7 +450,6 @@ class MatchAlgorithm:
                         else:
                             user_marital_pref = [str(marital_pref).strip().lower()]
                 
-                # 'any' means accept all
                 marital_matches_pref = (
                     not user_marital_pref or
                     "any" in user_marital_pref or
@@ -500,21 +476,21 @@ class MatchAlgorithm:
                 if prefers_long_distance:
                     score += 10
                 else:
-                        if distance_km <= 100:
-                            penalty_percent = distance_km / 100  # e.g., 75km → 0.75
+                        if distance_km <= 50:
+                            score += 10
+                        if distance_km <= 1000:
+                            penalty_percent = distance_km / 950 
                             score += round(10 * (1 - penalty_percent), 2)
                         else:
-                            score += 0  # Too far for user who doesn't prefer long-distance
+                            score += 0 
         except Exception as e:
             print("LONG DISTANCE MATCH ERROR:", e)
         total_weight += 10
 
         try:
             if user_detail and candidate_detail:
-                user_persionality = str(user_detail.get("personality", "")).strip().lower()
                 candidate_personality = str(candidate_detail.get("personality", "")).strip().lower()
           
-                # Get user personality preferences from interests 'looking_for'
                 personality_doc = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
                 user_personality_pref = []
                 if personality_doc:
@@ -526,7 +502,6 @@ class MatchAlgorithm:
                         else:
                             user_personality_pref = [str(personality_pref).strip().lower()]
 
-                # Allow 'any' to mean all persionality are accepted
                 personality_matches_pref = (
                     not user_personality_pref or 
                     "any" in user_personality_pref or 
@@ -541,7 +516,6 @@ class MatchAlgorithm:
         total_weight += 10
 
         try:
-            # Get interests (looking_for) of both users
             user_interests = self._get_document(self.interests, user_detail.get("user_id") or user_detail.get("_id"))
             candidate_interests = self._get_document(self.interests, candidate_detail.get("user_id") or candidate_detail.get("_id"))
 
@@ -560,7 +534,6 @@ class MatchAlgorithm:
                 if pref:
                     candidate_living_pref = [str(p).strip().lower() for p in pref] if isinstance(pref, list) else [str(pref).strip().lower()]
 
-            # Match logic including "any"
             living_pref_match = (
                 "any" in user_living_pref or
                 "any" in candidate_living_pref or

@@ -293,7 +293,7 @@ export default function Registration() {
                 <option value="">Select Gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                {/* <option value="Other">Other</option> */}
               </select>
               <select
                 name="personality"
@@ -387,6 +387,7 @@ export default function Registration() {
                 <option value="Divorced">Divorced</option>
                 <option value="Widowed">Widowed</option>
               </select>
+
               <select
                 name="education"
                 value={detailsData.education}
@@ -401,19 +402,7 @@ export default function Registration() {
                 <option value="Master's">Master's</option>
                 <option value="PhD">PhD</option>
               </select>
-              {/* <select
-                name="profession"
-                value={detailsData.profession}
-                onChange={handleDetailsChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-800 transition"
-                required
-              >
-                <option value="">select your profession</option>
-                <option value="Engineer">Engineer</option>
-                <option value="Doctor">Doctor</option>
-                <option value="Artist">Artist</option>
-                <option value="Teacher">Teacher</option>
-              </select> */}
+        
               <input
                 type="text"
                 name="profession"

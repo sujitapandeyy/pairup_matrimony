@@ -169,23 +169,159 @@ export default function EditProfile({
       </div>
 
       {/* Preferences */}
-      <div className="bg-white rounded-2xl shadow-lg p-8">
-        <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <Heart className="h-6 w-6 text-red-500" />
-          Partner Preferences
-        </h3>
-        <div className="grid md:grid-cols-2 gap-6">
-          <SelectField label="Age Group" name="lookingFor.ageGroup" value={formData.lookingFor?.ageGroup ?? ""} onChange={onFormChange} options={lookingForOptions.ageGroup} />
-          <SelectField label="Height" name="lookingFor.height" value={formData.lookingFor?.height ?? ""} onChange={onFormChange} options={lookingForOptions.height} />
-          <SelectField label="Gender" name="lookingFor.gender" value={formData.lookingFor?.gender ?? ""} onChange={onFormChange} options={lookingForOptions.gender} />
-          <SelectField label="Religion" name="lookingFor.religion" value={formData.lookingFor?.religion ?? ""} onChange={onFormChange} options={lookingForOptions.religion} />
-          <SelectField label="Caste" name="lookingFor.caste" value={formData.lookingFor?.caste ?? ""} onChange={onFormChange} options={lookingForOptions.caste} />
-          <SelectField label="Marital Status" name="lookingFor.maritalStatus" value={formData.lookingFor?.maritalStatus ?? ""} onChange={onFormChange} options={lookingForOptions.maritalStatus} />
-          <SelectField label="Education" name="lookingFor.education" value={formData.lookingFor?.education ?? ""} onChange={onFormChange} options={lookingForOptions.education} />
-          <InputField label="Profession" name="lookingFor.profession" value={formData.lookingFor?.profession ?? ""} onChange={onFormChange} />
-          <SelectField label="Partner Family Type" name="lookingFor.partner_family_type" value={formData.lookingFor?.partner_family_type ?? ""} onChange={onFormChange} options={lookingForOptions.familyType} />
-        </div>
-      </div>
+<div className="bg-white rounded-2xl shadow-lg p-8">
+  <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+    <Heart className="h-6 w-6 text-red-500" />
+    Partner Preferences
+  </h3>
+  <div className="grid md:grid-cols-2 gap-6">
+
+    <SelectField
+      label="Age Group"
+      name="lookingFor.age_group"
+      value={formData.lookingFor?.age_group ?? ""}
+      onChange={onFormChange}
+      options={ageGroupOptions}
+    />
+
+    <SelectField
+      label="Height"
+      name="lookingFor.height"
+      value={formData.lookingFor?.height ?? ""}
+      onChange={onFormChange}
+      options={heightOptions}
+    />
+
+    <SelectField
+      label="Gender"
+      name="lookingFor.gender"
+      value={formData.lookingFor?.gender ?? ""}
+      onChange={onFormChange}
+      options={genderOptions}
+    />
+
+    <SelectField
+      label="Marital Status"
+      name="lookingFor.marital_status"
+      value={formData.lookingFor?.marital_status ?? ""}
+      onChange={onFormChange}
+      options={maritalStatusOptions}
+    />
+
+    <SelectField
+      label="Religion"
+      name="lookingFor.religion"
+      value={formData.lookingFor?.religion ?? ""}
+      onChange={onFormChange}
+      options={religionOptions}
+    />
+
+    <SelectField
+      label="Personality"
+      name="lookingFor.personality"
+      value={formData.lookingFor?.personality ?? ""}
+      onChange={onFormChange}
+      options={persionalityOptions}
+    />
+
+    <SelectField
+      label="Pet Preference"
+      name="lookingFor.pet_preference"
+      value={formData.lookingFor?.pet_preference ?? ""}
+      onChange={onFormChange}
+      options={["Love Them", "Usually don't prefer"]}
+    />
+
+    <SelectField
+      label="Education Level"
+      name="lookingFor.education_level"
+      value={formData.lookingFor?.education_level ?? ""}
+      onChange={onFormChange}
+      options={educationOptions}
+    />
+
+    <InputField
+      label="Profession"
+      name="lookingFor.profession"
+      value={formData.lookingFor?.profession ?? ""}
+      onChange={onFormChange}
+    />
+
+    <SelectField
+      label="Family Type"
+      name="lookingFor.family_type"
+      value={formData.lookingFor?.family_type ?? ""}
+      onChange={onFormChange}
+      options={familyTypeOptions}
+    />
+
+    <SelectField
+      label="Family Values"
+      name="lookingFor.family_values"
+      value={formData.lookingFor?.family_values ?? ""}
+      onChange={onFormChange}
+      options={["Traditional", "Moderate", "Liberal"]}
+    />
+
+    <SelectField
+      label="Living Preference"
+      name="lookingFor.living_preference"
+      value={formData.lookingFor?.living_preference ?? ""}
+      onChange={onFormChange}
+      options={["City", "Village", "Abroad"]}
+    />
+
+    <SelectField
+      label="Open to Long Distance?"
+      name="lookingFor.long_distance"
+      value={formData.lookingFor?.long_distance ?? ""}
+      onChange={onFormChange}
+      options={["Yes", "Usually don't prefer"]}
+    />
+<div className="space-y-2">
+  <label className="block text-sm font-semibold text-gray-700">Caste</label>
+  <div className="flex flex-wrap gap-3 max-h-60 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
+    {casteOptions.map((caste) => {
+      const casteValue = formData.lookingFor?.caste;
+
+      const selectedCastes = Array.isArray(casteValue)
+        ? casteValue
+        : typeof casteValue === 'string'
+          ? casteValue.split(',').map(s => s.trim()).filter(Boolean)
+          : [];
+
+      const isChecked = selectedCastes.includes(caste);
+
+      return (
+        <label key={caste} className="inline-flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            value={caste}
+            checked={isChecked}
+            onChange={(e) => {
+              let newCastes = [...selectedCastes];
+              if (e.target.checked) {
+                if (!newCastes.includes(caste)) newCastes.push(caste);
+              } else {
+                newCastes = newCastes.filter(c => c !== caste);
+              }
+              onFormChange({
+                target: {
+                  name: "lookingFor.caste",
+                  value: newCastes.join(", ")
+                }
+              } as any);
+            }}
+          />
+          <span className="text-sm">{caste}</span>
+        </label>
+      );
+    })}
+  </div>
+</div>
+  </div>
+</div>
+
 
       {/* Save Button */}
       <div className="flex justify-center gap-4">
