@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import api from '@/lib/api'
 import { Badge } from './ui/badge'
+import { url } from 'inspector'
 
 const ProfileCards = () => {
   const router = useRouter()
@@ -28,47 +29,91 @@ const ProfileCards = () => {
     }
   }, [])
 
-  useEffect(() => {
+  const fetchSimilarProfiles = async () => {
     if (!email) return
 
-    api
-      .get(`/matches/get_profiles?email=${encodeURIComponent(email)}`)
-      .then((res) => {
-        const filtered = res.data.profiles.filter((p: any) => p.email !== email)
-        setProfiles(filtered)
-        setCurrentIndex(0)
+    try {
+      const res = await api.get(`/matches/get_profiles?email=${encodeURIComponent(email)}`)
+      const filtered = res.data.profiles.filter((p: any) => p.email !== email)
+      setProfiles(filtered)
+      setCurrentIndex(0)
 
-        const shuffled = [...filtered].sort(() => 0.5 - Math.random())
-        setRandomProfiles(shuffled.slice(0, 5))
-      })
-      .catch(() => toast.error('Failed to fetch profiles'))
+      try {
+        const simRes = await api.get(`/matches/similar_to_liked?email=${encodeURIComponent(email)}`)
+        const similar = simRes.data
+        if (similar && similar.length > 0) {
+          setRandomProfiles(similar)
+        } else {
+          const fallback = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 5)
+          setRandomProfiles(fallback)
+        }
+      } catch {
+        const fallback = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 5)
+        setRandomProfiles(fallback)
+      }
+    } catch {
+      toast.error('Failed to fetch profiles')
+    }
+  }
+
+  useEffect(() => {
+    if (email) {
+      fetchSimilarProfiles()
+    }
   }, [email])
 
   const handleSwipe = async (liked: boolean): Promise<void> => {
-    if (profiles.length === 0) return
-    const targetProfile = profiles[currentIndex]
+  if (profiles.length === 0) return
+  const targetProfile = profiles[currentIndex]
 
-    try {
-      await api.post('/matches/swipe', {
-        swiper_email: email,
-        target_email: targetProfile.email,
-        liked,
-      })
+  try {
+    await api.post('/matches/swipe', {
+      swiper_email: email,
+      target_email: targetProfile.email,
+      liked,
+    })
 
-      liked ? toast.success('Interest sent!') : toast.info('Skipped.')
+    liked ? toast.success('Interest sent!') : toast.info('Skipped.')
 
-      setProfiles((prev) => {
-        const updated = prev.filter((_, idx) => idx !== currentIndex)
-        const newIndex = currentIndex >= updated.length ? 0 : currentIndex
-        setCurrentIndex(newIndex)
-        const shuffled = [...updated].sort(() => 0.5 - Math.random())
-        setRandomProfiles(shuffled.slice(0, 5))
+    setProfiles((prev) => {
+      const updated = prev.filter((_, idx) => idx !== currentIndex)
+      const newIndex = currentIndex >= updated.length ? 0 : currentIndex
+      setCurrentIndex(newIndex)
+      return updated
+    })
+
+    if (liked) {
+      await fetchSimilarProfiles() // refresh similar profiles after like
+    } else {
+      // Remove crossed profile immediately from similar users sidebar
+      setRandomProfiles((prev) => {
+        let updated = prev.filter((profile) => profile.email !== targetProfile.email)
+
+        // Fill to 5 if possible
+        if (updated.length < 5) {
+          // Get emails already shown to avoid duplicates
+          const shownEmails = new Set(updated.map((p) => p.email))
+          shownEmails.add(targetProfile.email) // exclude crossed too
+
+          // Find candidates from main profiles excluding shown & crossed
+          const candidatesToAdd = profiles.filter(
+            (p) => !shownEmails.has(p.email)
+          )
+
+          // Add up to fill 5
+          updated = [...updated, ...candidatesToAdd.slice(0, 5 - updated.length)]
+        }
+
         return updated
       })
-    } catch {
-      toast.error('Swipe failed')
     }
+
+  } catch {
+    toast.error('Swipe failed')
   }
+}
+
+
 
   if (!email) return <div className="text-center py-10">Loading user...</div>
   if (profiles.length === 0) return <div className="text-center py-10">No profiles found.</div>
@@ -94,7 +139,7 @@ const ProfileCards = () => {
   }
 
   return (
-<div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto">
+    <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto" >
       {/* Main Profile Section */}
       <div className="flex-1 flex justify-center">
         <Card className="w-2/5 max-w-5xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
@@ -206,8 +251,9 @@ const ProfileCards = () => {
         </Card>
       </div>
 
-      {/* Similar Users */}
+      {/* Similar Users Sidebar */}
       <div className="w-full lg:w-[210px] space-y-6">
+        <p className="font-bold text-gray-700">You might also Like : </p>
         {randomProfiles.map((profile) => (
           <div
             key={profile.email}

@@ -1,6 +1,7 @@
 from bson.objectid import ObjectId
 from datetime import datetime
-
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 class MatchService:
     def __init__(self, db):
         self.users = db["users"]
@@ -209,3 +210,88 @@ class MatchService:
         })
 
         return swipe_result.deleted_count > 0
+    
+
+
+    def get_similar_to_liked_users(self, email, request):
+        # Step 1: Get users the logged-in user has liked
+        swiped_users = list(self.swipes.find({"swiper": email}))
+        swiped_emails = [entry["target"] for entry in swiped_users]
+
+
+        if not swiped_emails:
+            return []
+
+        # Step 2: Get their details
+        liked_details = list(self.details.find({
+            "user_id": {"$in": [self.users.find_one({"email": e})["_id"] for e in swiped_emails if self.users.find_one({"email": e})]}
+        }))
+
+        # Step 3: Gather preference features
+        def feature_vector(detail):
+            return {
+                "user_id": detail["user_id"],
+                "gender": detail.get("gender", ""),
+                "religion": detail.get("religion", ""),
+                "hobbies": " ".join(detail.get("hobbies", [])),
+                "age": str(detail.get("age", "")),
+            }
+
+        liked_vectors = [feature_vector(d) for d in liked_details]
+
+        # Create synthetic profile representing the liked user's preferences
+        combined = {
+            "gender": " ".join([v["gender"] for v in liked_vectors]),
+            "religion": " ".join([v["religion"] for v in liked_vectors]),
+            "hobbies": " ".join([v["hobbies"] for v in liked_vectors]),
+            "age": " ".join([v["age"] for v in liked_vectors])
+        }
+
+       # Get dominant gender from liked profiles
+        preferred_gender = liked_vectors[0]["gender"] if liked_vectors else ""
+
+        # Step 4: Get all other users excluding self and previously liked
+        candidate_users = list(self.users.find({
+            "email": {"$nin": swiped_emails + [email]}
+        }))
+
+        candidates = []
+        for user in candidate_users:
+            detail = self.details.find_one({"user_id": user["_id"]})
+            if not detail:
+                continue
+
+            # Filter by matching gender
+            if detail.get("gender", "") != preferred_gender:
+                continue
+
+            vector = feature_vector(detail)
+            vector["name"] = user.get("name")
+            vector["email"] = user.get("email")
+            vector["images"] = [self.build_photo_url(request, user.get("photo"))]
+            vector["location"] = detail.get("location")
+            vector["profession"] = detail.get("profession")
+            vector["education"] = detail.get("education")
+            candidates.append(vector)
+
+
+        # Step 5: Vectorize and compare using cosine similarity
+        corpus = [
+            f"{combined['gender']} {combined['religion']} {combined['hobbies']} {combined['age']}"
+        ] + [
+            f"{c['gender']} {c['religion']} {c['hobbies']} {c['age']}" for c in candidates
+        ]
+
+        vectorizer = CountVectorizer().fit_transform(corpus)
+        similarity = cosine_similarity(vectorizer)
+
+        results = []
+        for idx, score in enumerate(similarity[0][1:]):
+            if score > 0:  # You may tweak the threshold
+                c = candidates[idx]
+                c["similarity_score"] = round(score, 3)
+                results.append(c)
+
+        # Sort by similarity descending
+        results.sort(key=lambda x: x["similarity_score"], reverse=True)
+        return results[:5]

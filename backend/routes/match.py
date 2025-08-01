@@ -112,6 +112,17 @@ def cancel_sent_request():
         return jsonify({"message": "Request cancelled"}), 200
     else:
         return jsonify({"error": "Request not found"}), 404
+    
+@match_bp.route("/similar_to_liked", methods=["GET"])
+def similar_to_liked():
+        email = request.args.get("email")
+        if not email:
+            return jsonify({"error": "Missing email"}), 400
+
+        service = MatchService(current_app.mongo.db)
+        results = service.get_similar_to_liked_users(email, request)
+        return jsonify(results), 200
+
 
 # def _calculate_trait_similarity(self, traits1, traits2):
 #     if not traits1 or not traits2:

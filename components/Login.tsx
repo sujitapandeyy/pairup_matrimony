@@ -74,7 +74,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12 "style={{ backgroundImage: `url("img/bg1.jpg")`,     backgroundRepeat: "no-repeat",
+backgroundSize: "cover",backgroundPosition: "center" }}>
       <div className="bg-white shadow-xl rounded-xl max-w-md w-full p-8">
         <h1 className="text-3xl font-serif font-bold text-pink-00 mb-4 text-center flex items-center justify-center gap-2">
           {/* <span className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">

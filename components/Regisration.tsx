@@ -185,7 +185,9 @@ export default function Registration() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12" 
+    // style={{ backgroundImage: `url("img/bg2.jpg")`,     backgroundRepeat: "no-repeat",backgroundSize: "cover",backgroundPosition: "center" }}
+    >
       <div className="bg-white shadow-xl rounded-xl max-w-md w-full p-8 ">
        <div className="text-center mb-6">
   <h1 className="text-3xl font-serif font-bold text-gray-800">
@@ -366,8 +368,11 @@ export default function Registration() {
                 <option value="5'6&quot;">5'6" (168 cm)</option>
                 <option value="5'7&quot;">5'7" (170 cm)</option>
                 <option value="5'8&quot;">5'8" (173 cm)</option>
-                <option value="5'9&quot;">5'9" (175 cm)</option>
-                <option value="5'10&quot;">5'10" (178 cm)</option>
+                <option value="5'9&quot;">5'10" (175 cm)</option>
+                <option value="5'10&quot;">5'11" (178 cm)</option>
+                <option value="5'10&quot;">6'0" (180 cm)</option>
+                <option value="5'10&quot;">6'1" (185 cm)</option>
+                <option value="5'10&quot;">6'2" (188 cm)</option>
               </select>
 
               <select

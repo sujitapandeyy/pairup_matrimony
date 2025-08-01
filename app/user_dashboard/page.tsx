@@ -85,7 +85,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-rose-50 via-purple-50 to-indigo-50">
-      <main className="max-w-full mx-auto px-4 py-8">
+      <main className="max-w-full mx-auto px-4 py-8 "
+      // style={{ backgroundImage: `url("img/bg1.jpg")`,     backgroundRepeat: "no-repeat", backgroundSize: "cover",backgroundPosition: "center" }}
+      >
         <ProfileCards />
       </main>
     </div>
