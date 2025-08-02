@@ -12,7 +12,6 @@ interface ProfileViewProps {
 export default function ProfileView({ profile, onEditClick }: ProfileViewProps) {
   return (
     <div className="space-y-8">
-      {/* Personal Information Card */}
       <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-200">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Users className="h-6 w-6 text-pink-500" />
@@ -31,7 +30,6 @@ export default function ProfileView({ profile, onEditClick }: ProfileViewProps) 
         </div>
       </div>
 
-      {/*  Information Card */}
       <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-xl transition-shadow duration-200">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
           <Briefcase className="h-6 w-6 text-purple-500" />

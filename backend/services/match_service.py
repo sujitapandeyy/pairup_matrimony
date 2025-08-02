@@ -1,7 +1,8 @@
 from bson.objectid import ObjectId
 from datetime import datetime
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+
+from math import radians, sin, cos, sqrt, atan2
+
 class   MatchService:
     def __init__(self, db):
         self.users = db["users"]
@@ -9,6 +10,21 @@ class   MatchService:
         self.swipes = db["swipes"]
         self.notifications = db["notifications"]
         self.matches = db["matches"]
+    def _cosine_similarity(self, vec1, vec2):
+        dot_product = sum(a*b for a,b in zip(vec1, vec2))
+        magnitude1 = sqrt(sum(a**2 for a in vec1))
+        magnitude2 = sqrt(sum(b**2 for b in vec2))
+        
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0
+        return dot_product / (magnitude1 * magnitude2)
+
+    def _text_to_vector(self, text):
+        words = text.lower().split()
+        word_counts = {}
+        for word in words:
+            word_counts[word] = word_counts.get(word, 0) + 1
+        return word_counts
 
     def build_photo_url(self, request, raw_photo):
         base_url = request.host_url.rstrip('/')
@@ -214,116 +230,92 @@ class   MatchService:
 
 
     def get_similar_to_liked_users(self, email, request):
-        # Step 1: Get all users the current user has swiped on
-        swiped_users = list(self.swipes.find({"swiper": email}))
+        current_user = self.users.find_one({"email": email})
+        if not current_user:
+            return []
+        
+        current_detail = self.details.find_one({"user_id": current_user["_id"]})
+        if not current_detail:
+            return []
+
+        swiped_users = list(self.swipes.find({"swiper": email, "liked": True}))
         swiped_emails = [entry["target"] for entry in swiped_users]
 
         if not swiped_emails:
             return []
 
-        # Step 2: Get their details more safely
-        user_ids = []
-        for e in swiped_emails:
-            user = self.users.find_one({"email": e})
-            if user:
-                user_ids.append(user["_id"])
-        
-        liked_details = list(self.details.find({"user_id": {"$in": user_ids}}))
+        liked_users = list(self.users.find({"email": {"$in": swiped_emails}}))
+        liked_user_ids = [user["_id"] for user in liked_users]
+        liked_details = list(self.details.find({"user_id": {"$in": liked_user_ids}}))
 
-        # Step 3: Enhanced feature vector with fallbacks
-        def feature_vector(detail):
-            return {
-                "user_id": detail.get("user_id", ""),
-                "gender": detail.get("gender", "").lower(),
-                "caste": detail.get("caste", "").lower(),
-                "religion": detail.get("religion", "").lower(),
-                "hobbies": " ".join(detail.get("hobbies", [])).lower(),
-                "age": str(detail.get("age", "")),
-            }
-
-        liked_vectors = [feature_vector(d) for d in liked_details if d]
-
-        if not liked_vectors:
+        if not liked_details:
             return []
 
-        # Step 4: Better preference detection
         def get_most_common(vectors, key):
-            values = [v[key] for v in vectors if v.get(key)]
+            values = [v.get(key, "").lower() for v in vectors if v.get(key)]
             if not values:
                 return None
             return max(set(values), key=values.count)
 
-        preferred_gender = get_most_common(liked_vectors, "gender")
-        preferred_caste = get_most_common(liked_vectors, "caste")
-        
-        # Step 5: Get candidates with more flexible filtering
+        preferred_gender = get_most_common(liked_details, "gender")
+        preferred_caste = get_most_common(liked_details, "caste")
+
+        def create_profile_text(detail):
+            return " ".join([
+                detail.get("gender", "").lower(),
+                detail.get("caste", "").lower(),
+                detail.get("religion", "").lower(),
+                " ".join(h.lower() for h in detail.get("hobbies", [])),
+                str(detail.get("age", 0)),
+                detail.get("profession", "").lower(),
+                detail.get("education", "").lower()
+            ])
+
+        liked_text = " ".join(create_profile_text(d) for d in liked_details)
+
         candidate_users = list(self.users.find({
             "email": {"$nin": swiped_emails + [email]}
         }))
 
         candidates = []
         for user in candidate_users:
-            if not user:
-                continue
-                
-            detail = self.details.find_one({"user_id": user.get("_id")})
+            detail = self.details.find_one({"user_id": user["_id"]})
             if not detail:
                 continue
 
-            vector = feature_vector(detail)
-            
-            # More flexible filtering
-            caste_match = True
-            if preferred_caste:  # Only filter by caste if we have a preference
-                caste_match = vector["caste"] == preferred_caste
-                
-            gender_match = True
-            if preferred_gender:  # Only filter by gender if we have a preference
-                gender_match = vector["gender"] == preferred_gender
-                
-            if not (caste_match and gender_match):
+            # Rule-based filtering
+            candidate_gender = detail.get("gender", "").lower()
+            candidate_caste = detail.get("caste", "").lower()
+
+            if preferred_gender and candidate_gender != preferred_gender:
                 continue
 
-            # Build candidate with null checks
-            photo = user.get("photo")
-            candidates.append({
-                **vector,
-                "name": user.get("name", "Unknown"),
-                "email": user.get("email", ""),
-                "images": [self.build_photo_url(request, photo)] if photo else [],
-                "location": detail.get("location", ""),
-                "profession": detail.get("profession", ""),
-                "education": detail.get("education", "")
-            })
+            if preferred_caste and candidate_caste != preferred_caste:
+                continue
 
-        # Step 6: Similarity calculation with null checks
-        if not candidates:
-            return []
+            candidate_text = create_profile_text(detail)
 
-        corpus = [
-            f"{' '.join(v['gender'] for v in liked_vectors)} "
-            f"{' '.join(v['caste'] for v in liked_vectors)} "
-            f"{' '.join(v['religion'] for v in liked_vectors)} "
-            f"{' '.join(v['hobbies'] for v in liked_vectors)} "
-            f"{' '.join(v['age'] for v in liked_vectors)}"
-        ] + [
-            f"{c['gender']} {c['caste']} {c['religion']} {c['hobbies']} {c['age']}" 
-            for c in candidates
-        ]
-
-        try:
-            vectorizer = CountVectorizer().fit_transform(corpus)
-            similarity = cosine_similarity(vectorizer)
+            liked_vec = self._text_to_vector(liked_text)
+            candidate_vec = self._text_to_vector(candidate_text)
             
-            results = []
-            for idx, score in enumerate(similarity[0][1:]):
-                if score > 0:
-                    results.append({
-                        **candidates[idx],
-                        "similarity_score": round(score, 3)
-                    })
-                    
-            return sorted(results, key=lambda x: x["similarity_score"], reverse=True)[:5]
-        except Exception as e:
-            print(f"Similarity calculation failed: {e}")
-            return []
+            all_words = set(liked_vec.keys()).union(set(candidate_vec.keys()))
+            vec1 = [liked_vec.get(word, 0) for word in all_words]
+            vec2 = [candidate_vec.get(word, 0) for word in all_words]
+            
+            similarity = self._cosine_similarity(vec1, vec2)
+
+            if similarity > 0.3:
+                photo = user.get("photo")
+                candidates.append({
+                    "id": str(user["_id"]),
+                    "name": user.get("name", "Unknown"),
+                    "email": user.get("email", ""),
+                    "images": [self.build_photo_url(request, photo)] if photo else [],
+                    "location": detail.get("location", ""),
+                    "age": detail.get("age", ""),
+                    "profession": detail.get("profession", ""),
+                    "education": detail.get("education", ""),
+                    "similarity_score": round(similarity, 3)
+                })
+
+        return sorted(candidates, key=lambda x: x["similarity_score"], reverse=True)[:5]

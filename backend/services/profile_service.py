@@ -97,7 +97,9 @@ class ProfileService:
             "profession": "profession",
             "caption": "caption",
             "personality": "personality",
-            "hobbies": "hobbies"
+            "hobbies": "hobbies",
+            "latitude": "latitude", 
+            "longitude": "longitude"
         }
         for key, db_key in fields.items():
             if key in data:

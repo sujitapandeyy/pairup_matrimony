@@ -43,12 +43,10 @@ const ProfileCards = () => {
         const simRes = await api.get(`/matches/similar_to_liked?email=${encodeURIComponent(email)}`)
         let similar = simRes.data || []
         
-        // If we don't have enough similar profiles, fill with random ones
         if (similar.length < 5) {
           const remaining = 5 - similar.length
-          // Get random profiles that aren't already in the similar list
           const availableProfiles = allProfiles.filter(
-            p => !similar.some(s => s.email === p.email)
+            (p: any) => !similar.some((s: any) => s.email === p.email)
           )
           const random = [...availableProfiles]
             .sort(() => 0.5 - Math.random())
@@ -56,9 +54,8 @@ const ProfileCards = () => {
           similar = [...similar, ...random]
         }
         
-        setRandomProfiles(similar.slice(0, 5)) // Ensure we always have 5
+        setRandomProfiles(similar.slice(0, 5)) 
       } catch {
-        // Fallback to random profiles if similar fetch fails
         const random = [...allProfiles]
           .sort(() => 0.5 - Math.random())
           .slice(0, 5)
@@ -101,7 +98,6 @@ const ProfileCards = () => {
         setRandomProfiles((prev) => {
           let updated = prev.filter((profile) => profile.email !== targetProfile.email)
 
-          // Fill to 5 if possible
           if (updated.length < 5) {
             const shownEmails = new Set([
               ...updated.map((p) => p.email),
@@ -116,7 +112,7 @@ const ProfileCards = () => {
             updated = [...updated, ...candidatesToAdd]
           }
 
-          return updated.slice(0, 5) // Ensure we maintain 5
+          return updated.slice(0, 5)
         })
       }
     } catch {
@@ -135,7 +131,6 @@ const ProfileCards = () => {
       setCurrentIndex(idx)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      // If profile not found in main list, add it temporarily
       setProfiles(prev => [...prev, profile])
       setCurrentIndex(profiles.length)
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -152,7 +147,6 @@ const ProfileCards = () => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto" >
-      {/* Main Profile Section */}
       <div className="flex-1 flex justify-center">
         <Card className="w-2/5 max-w-5xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
           <div

@@ -26,7 +26,6 @@ class RegisterService:
         if self.user_model.get_by_email(email):
             return {'success': False, 'message': 'Email already registered'}, 409
 
-        # Common user document
         hashed_password = generate_password_hash(password)
         user_doc = {
             'name': name,
@@ -37,7 +36,6 @@ class RegisterService:
             'photo': '/img/defaultboy.jpg', 
         }
 
-        # Admins don’t need details or interests
         if role == 'admin':
             try:
                 result = self.user_model.create_user(user_doc)
@@ -46,7 +44,6 @@ class RegisterService:
                 print(f"Admin registration error: {e}")
                 return {'success': False, 'message': 'Server error'}, 500
 
-        # Validate user details (for normal users)
         if not details:
             return {'success': False, 'message': 'User details are required'}, 400
 
@@ -72,7 +69,6 @@ class RegisterService:
         if any(not field for field in required_fields):
             return {'success': False, 'message': 'Missing required personal details'}, 400
 
-        # Profile image based on gender
         gender = details.get('gender')
         user_doc['photo'] = '/img/defaultgirl.jpg' if gender == 'Female' else '/img/defaultboy.jpg'
         user_doc['interests_completed'] = False  
