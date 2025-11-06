@@ -10,11 +10,16 @@ import { Button } from "@/components/ui/button";
 
 const defaultForm = {
   partner_age: "",
+  partner_age_from: "",
+  partner_age_to: "",
   partner_gender: "",
   partner_height: "",
+  partner_height_to:"",
+  partner_height_from:"",
   partner_marital_status: "",
   partner_religion: "",
-  partner_caste: [] as string[],  partner_personality: "",
+  partner_caste: [] as string[],
+  partner_personality: "",
   partner_pets: "",
   partner_education: "",
   partner_profession: "",
@@ -24,8 +29,22 @@ const defaultForm = {
   partner_long_distance: "",
 };
 const casteOptions = [
-  "Brahmin", "Chhetri", "Thakuri", "Newar", "Tamang", "Magar", "Rai",
-  "Limbu", "Sherpa", "Gurung", "Tharu", "Madhesi", "Muslim", "Dalit", "Other", "Any"
+  "Brahmin",
+  "Chhetri",
+  "Thakuri",
+  "Newar",
+  "Tamang",
+  "Magar",
+  "Rai",
+  "Limbu",
+  "Sherpa",
+  "Gurung",
+  "Dalit",
+  "Tharu",
+  "Madhesi",
+  "Muslim",
+  "Other",
+//   "Any",
 ];
 
 export default function Interests() {
@@ -47,7 +66,9 @@ export default function Interests() {
     field: keyof typeof defaultForm,
     value: string
   ) => {
-    const selected = Array.isArray(formData[field]) ? (formData[field] as string[]) : [];
+    const selected = Array.isArray(formData[field])
+      ? (formData[field] as string[])
+      : [];
     const updated = selected.includes(value)
       ? selected.filter((v) => v !== value)
       : [...selected, value];
@@ -62,11 +83,7 @@ export default function Interests() {
         "partner_height",
         "partner_marital_status",
       ],
-      1: [
-        "partner_religion",
-        "partner_personality",
-        "partner_pets",
-      ],
+      1: ["partner_religion", "partner_personality", "partner_pets"],
       2: [
         "partner_education",
         "partner_profession",
@@ -86,7 +103,7 @@ export default function Interests() {
     });
 
     if (missing.length > 0) {
-        console.warn("Missing fields:", missing);
+      console.warn("Missing fields:", missing);
 
       toast.error("Please fill all required fields before proceeding.");
       return false;
@@ -132,21 +149,7 @@ export default function Interests() {
       icon: <User className="h-10 w-10 text-pink-500 mx-auto mb-4" />,
       fields: (
         <>
-          <select
-            className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
-            value={formData.partner_age}
-            onChange={(e) =>
-              setFormData({ ...formData, partner_age: e.target.value })
-            }
-          >
-            <option value="">Preferred Age Group</option>
-            <option>18-24</option>
-            <option>25-30</option>
-            <option>31-35</option>
-            <option>36-40</option>
-            <option>41-45</option>
-            <option>46+</option>
-          </select>
+          
 
           <select
             className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
@@ -161,24 +164,8 @@ export default function Interests() {
             <option>Any</option>
           </select>
 
-          <select
-            className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
-            value={formData.partner_height}
-            onChange={(e) =>
-              setFormData({ ...formData, partner_height: e.target.value })
-            }
-          >
-            <option value="">Preferred Height</option>
-            <option value="Below 5'0&quot;">Below 5'0"</option>
-            <option value="5'0&quot; - 5'2&quot;">5'0" - 5'2"</option>
-            <option value="5'3&quot; - 5'5&quot;">5'3" - 5'5"</option>
-            <option value="5'6&quot; - 5'8&quot;">5'6" - 5'8"</option>
-            <option value="5'9&quot; - 5'11&quot;">5'9" - 5'11"</option>
-            <option value="Above 5'11&quot;">Above 5'11"</option>
-            <option value="Any">Any</option>
-          </select>
 
-          <select
+<select
             className="w-full mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
             value={formData.partner_marital_status}
             onChange={(e) =>
@@ -194,6 +181,115 @@ export default function Interests() {
             <option>Widowed</option>
             <option>Any</option>
           </select>
+
+          
+          <div className="flex gap-3">
+  {/* From Height */}
+  <select
+    className="w-1/2 p-3 border border-gray-400 rounded-xl text-gray-600"
+    value={formData.partner_height_from}
+    onChange={(e) => {
+      const from = e.target.value;
+      const to = formData.partner_height_to;
+      setFormData({
+        ...formData,
+        partner_height_from: from,
+        partner_height: from && to ? `${from} - ${to}` : from || "",
+      });
+    }}
+  >
+    <option value="">Height From</option>
+    <option value="5'0&quot;">5'0"</option>
+    <option value="5'1&quot;">5'1"</option>
+    <option value="5'2&quot;">5'2"</option>
+    <option value="5'3&quot;">5'3"</option>
+    <option value="5'4&quot;">5'4"</option>
+    <option value="5'5&quot;">5'5"</option>
+    <option value="5'6&quot;">5'6"</option>
+    <option value="5'7&quot;">5'7"</option>
+    <option value="5'8&quot;">5'8"</option>
+    <option value="5'9&quot;">5'9"</option>
+    <option value="5'10&quot;">5'10"</option>
+    <option value="5'11&quot;">5'11"</option>
+  </select>
+
+  {/* To Height */}
+  <select
+    className="w-1/2 p-3 border border-gray-400 rounded-xl text-gray-600"
+    value={formData.partner_height_to}
+    onChange={(e) => {
+      const to = e.target.value;
+      const from = formData.partner_height_from;
+      setFormData({
+        ...formData,
+        partner_height_to: to,
+        partner_height: from && to ? `${from} - ${to}` : from || to || "",
+      });
+    }}
+  >
+    <option value="">Height To</option>
+    <option value="Below 5'0&quot;">Below 5'0"</option>
+    <option value="5'0&quot;">5'0"</option>
+    <option value="5'1&quot;">5'1"</option>
+    <option value="5'2&quot;">5'2"</option>
+    <option value="5'3&quot;">5'3"</option>
+    <option value="5'4&quot;">5'4"</option>
+    <option value="5'5&quot;">5'5"</option>
+    <option value="5'6&quot;">5'6"</option>
+    <option value="5'7&quot;">5'7"</option>
+    <option value="5'8&quot;">5'8"</option>
+    <option value="5'9&quot;">5'9"</option>
+    <option value="5'10&quot;">5'10"</option>
+    <option value="5'11&quot;">5'11"</option>
+    <option value="Above 5'11&quot;">Above 5'11"</option>
+  </select>
+</div>
+
+
+          
+
+          <div className="flex gap-3">
+  {/* From Age */}
+  <select
+    className="w-1/2 mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
+    value={formData.partner_age_from}
+    onChange={(e) => {
+      const from = e.target.value;
+      const to = formData.partner_age_to;
+      setFormData({
+        ...formData,
+        partner_age_from: from,
+        partner_age: from && to ? `${from}-${to}` : "",
+      });
+    }}
+  >
+    <option value="">Age From</option>
+    {Array.from({ length: 29 }, (_, i) => 18 + i).map((age) => (
+      <option key={age} value={age}>{age}</option>
+    ))}
+  </select>
+
+  {/* To Age */}
+  <select
+    className="w-1/2 mb-3 p-3 border border-gray-400 rounded-xl text-gray-600"
+    value={formData.partner_age_to}
+    onChange={(e) => {
+      const to = e.target.value;
+      const from = formData.partner_age_from;
+      setFormData({
+        ...formData,
+        partner_age_to: to,
+        partner_age: from && to ? `${from}-${to}` : "",
+      });
+    }}
+  >
+    <option value="">Age To</option>
+    {Array.from({ length: 29 }, (_, i) => 18 + i).map((age) => (
+      <option key={age} value={age}>{age}</option>
+    ))}
+  </select>
+</div>
+
         </>
       ),
     },
@@ -212,53 +308,14 @@ export default function Interests() {
           >
             <option value="">Prefered Religion</option>
             <option value="Hindu">Hindu</option>
-                <option value="Muslim">Muslim</option>
-                <option value="Christian">Christian</option>
-                <option value="Sikh">Sikh</option>
-                <option value="Buddhist">Buddhist</option>
-                <option value="Jain">Jain</option>
-                <option value="Other">Other</option>
+            <option value="Muslim">Muslim</option>
+            <option value="Christian">Christian</option>
+            <option value="Sikh">Sikh</option>
+            <option value="Buddhist">Buddhist</option>
+            <option value="Jain">Jain</option>
+            <option value="Other">Other</option>
             <option value="Any">Any</option>
           </select>
-<div className="w-full mb-3 p-4 border border-gray-400 rounded-xl text-gray-700">
-  <label className="block font-semibold mb-2">Preferred Castes</label>
-
-  <div className="flex flex-wrap gap-3 max-h-60 overflow-y-auto">
-    {/* Select All */}
-    <label className="flex items-center gap-2">
-      <input
-        type="checkbox"
-        checked={formData.partner_caste.length === casteOptions.length}
-        onChange={(e) => {
-          if (e.target.checked) {
-            setFormData({ ...formData, partner_caste: casteOptions });
-          } else {
-            setFormData({ ...formData, partner_caste: [] });
-          }
-        }}
-      />
-      <span className="text-sm">Select All</span>
-    </label>
-
-    {casteOptions.map((caste) => (
-      <label key={caste} className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          value={caste}
-          checked={formData.partner_caste.includes(caste)}
-          onChange={(e) => {
-            const selected = formData.partner_caste.includes(caste)
-              ? formData.partner_caste.filter((c) => c !== caste)
-              : [...formData.partner_caste, caste];
-
-            setFormData({ ...formData, partner_caste: selected });
-          }}
-        />
-        <span className="text-sm">{caste}</span>
-      </label>
-    ))}
-  </div>
-</div>
 
 
           <select
@@ -286,6 +343,61 @@ export default function Interests() {
             <option value="Balanced">Balanced</option>
             <option value="Any">Any</option>
           </select>
+
+          <div className="w-full mb-3 p-4 border border-gray-400 rounded-xl text-gray-700">
+  <label className="block font-semibold mb-2">Preferred Castes</label>
+
+  <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
+    {/* Select All */}
+    <label
+      className={`cursor-pointer rounded-lg px-4 py-2 border ${
+        formData.partner_caste.length === casteOptions.length
+          ? "bg-green-700 text-white border-green-700"
+          : "border-gray-300 text-gray-700 hover:bg-green-100"
+      } transition`}
+    >
+      <input
+        type="checkbox"
+        checked={formData.partner_caste.length === casteOptions.length}
+        onChange={(e) => {
+          if (e.target.checked) {
+            setFormData({ ...formData, partner_caste: casteOptions });
+          } else {
+            setFormData({ ...formData, partner_caste: [] });
+          }
+        }}
+        className="hidden"
+      />
+      Select All
+    </label>
+
+    {casteOptions.map((caste) => (
+      <label
+        key={caste}
+        className={`cursor-pointer rounded-lg px-4 py-2 border ${
+          formData.partner_caste.includes(caste)
+            ? "bg-green-700 text-white border-green-700"
+            : "border-gray-300 text-gray-700 hover:bg-green-100"
+        } transition`}
+      >
+        <input
+          type="checkbox"
+          value={caste}
+          checked={formData.partner_caste.includes(caste)}
+          onChange={() => {
+            const selected = formData.partner_caste.includes(caste)
+              ? formData.partner_caste.filter((c) => c !== caste)
+              : [...formData.partner_caste, caste];
+
+            setFormData({ ...formData, partner_caste: selected });
+          }}
+          className="hidden"
+        />
+        {caste}
+      </label>
+    ))}
+  </div>
+</div>
         </>
       ),
     },
@@ -302,12 +414,12 @@ export default function Interests() {
               setFormData({ ...formData, partner_education: e.target.value })
             }
           >
-             <option value="">Education</option>
-                <option value="High School">High School</option>
-                <option value="Diploma">Diploma</option>
-                <option value="Bachelor's">Bachelor's</option>
-                <option value="Master's">Master's</option>
-                <option value="PhD">PhD</option>
+            <option value="">Education</option>
+            <option value="High School">High School</option>
+            <option value="Diploma">Diploma</option>
+            <option value="Bachelor's">Bachelor's</option>
+            <option value="Master's">Master's</option>
+            <option value="PhD">PhD</option>
           </select>
 
           <input

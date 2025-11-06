@@ -20,3 +20,5 @@ def get_read_receipt():
     user = request.args.get('user')
     chat_with = request.args.get('chat_with')
     return chat_service.get_read_receipt(user, chat_with)
+
+

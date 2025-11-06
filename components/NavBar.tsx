@@ -39,33 +39,7 @@ const NavBar = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (!userEmail || role === 'admin') return;
-
-    const fetchCounts = () => {
-      fetch(`http://localhost:5050/matches/notifications?email=${encodeURIComponent(userEmail)}`)
-        .then(res => res.json())
-        .then(data => {
-          const count = Array.isArray(data)
-            ? data.filter((n: any) => n.type === 'request').length
-            : 0;
-          setRequestCount(count);
-        })
-        .catch(() => setRequestCount(0));
-
-      fetch(`http://localhost:5050/matches/sent_requests?email=${encodeURIComponent(userEmail)}`)
-        .then(res => res.json())
-        .then(data => {
-          const count = data?.sentRequests?.length || 0;
-          setSentRequestCount(count);
-        })
-        .catch(() => setSentRequestCount(0));
-    };
-
-    fetchCounts();
-    const interval = setInterval(fetchCounts, 10000);
-    return () => clearInterval(interval);
-  }, [userEmail, role]);
+   
 
   const currentView = (() => {
     if (pathname === '/' || pathname === '/user_dashboard') return 'dashboard';

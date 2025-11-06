@@ -70,3 +70,5 @@ class ChatService:
         })
 
         return jsonify({"last_read": doc.get("last_read") if doc else None})
+    
+    
