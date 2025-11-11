@@ -113,7 +113,7 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
 
-        <div className="relative z-10 max-w-6xl mx-auto px-6 text-left flex flex-col sm:flex-row items-center sm:items-start gap-10">
+        <div className="relative z-10 max-w-6xl mx-auto px-6  flex flex-col sm:flex-row ml-30 gap-10">
           <div className="max-w-xl text-white">
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
               Find Your <span className="text-pink-400">Soul-mate</span> with
@@ -133,13 +133,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="hidden sm:block w-[350px] lg:w-[450px]">
+          {/* <div className="hidden sm:block w-[350px] lg:w-[450px]">
             <img
               src="/img/couple.png"
               alt="Smiling couple"
               className="w-full h-auto object-contain drop-shadow-2xl rounded-sm"
             />
-          </div>
+          </div> */}
         </div>
       </section>
 

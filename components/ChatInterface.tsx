@@ -5,8 +5,11 @@ import { MessageCircle, Send, Heart } from 'lucide-react';
 import io from 'socket.io-client';
 import { toast } from 'sonner'
 import { SOCKET_SERVER } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+
 
 interface Match {
+  _id?: string;
   name: string;
   email: string;
   images: string[];
@@ -17,6 +20,7 @@ interface Match {
   lastSender?: string;
   lastRead?: string;
 }
+
 
 interface Message {
   sender: string;
@@ -48,6 +52,8 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   const socketRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const selectedChatRef = useRef<Match | null>(null);
+  const router = useRouter();
+
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
@@ -264,7 +270,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
   );
 
   return (
-    <div className="px-80 flex h-screen bg-gray-50">
+    <div className="px-80 flex h-screen bg-white">
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -342,34 +348,36 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
         ) : (
           <>
             <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src={selectedChat.images?.[0] || '/default-profile.jpg'}
-                  alt={selectedChat.name}
-                  className="w-12 h-12 rounded-full object-cover border border-gray-200"
-                />
-                {onlineUsers.includes(selectedChat.email) && (
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                )}
-              </div>
+  <div
+    className="relative cursor-pointer group"
+    onClick={() => {
+      if (selectedChat?._id) {
+        sessionStorage.setItem("lastViewedProfile", selectedChat.email);
+        sessionStorage.setItem("returningFromProfile", "true");
+        router.push(`/user/${selectedChat._id}`);
+      } else {
+        toast.error("User ID not found");
+      }
+    }}
+  >
+    <img
+      src={selectedChat.images?.[0] || '/default-profile.jpg'}
+      alt={selectedChat.name}
+      className="w-12 h-12 rounded-full object-cover border border-gray-200 group-hover:opacity-90 transition"
+    />
+    {onlineUsers.includes(selectedChat.email) && (
+      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+    )}
+  </div>
 
-              <div>
-                <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
-                <p className="text-sm text-gray-500">
-                  {onlineUsers.includes(selectedChat.email) ? 'Online' : 'Offline'} • {selectedChat.location || ''}
-                </p>
-              </div>
+  <div>
+    <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
+    <p className="text-sm text-gray-500">
+      {onlineUsers.includes(selectedChat.email) ? 'Online' : 'Offline'} • {selectedChat.location || ''}
+    </p>
+  </div>
+</div>
 
-              {/* Logged-in User Online Indicator */}
-              {/* <div className="ml-auto flex items-center gap-2">
-                <span className="text-sm text-gray-600">You</span>
-                <div
-                  className={`w-3 h-3 rounded-full border-2 border-gray-300 ${
-                    onlineUsers.includes(loggedInEmail) ? 'bg-green-500' : 'bg-gray-300'
-                  }`}
-                />
-              </div> */}
-            </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (

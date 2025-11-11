@@ -1,359 +1,362 @@
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Heart, X, MessageCircle, MapPin, Briefcase, GraduationCap, Badge } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
-import api from '@/lib/api'
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Heart,
+  X,
+  MessageCircle,
+  MapPin,
+  Briefcase,
+  Check,
+  Clock,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import api from "@/lib/api";
+import { getFullImageUrl } from "@/lib/utils/image";
+import { getCompatibilityColor } from "@/lib/utils/match";
+import { getTimeAgoKathmandu } from "@/lib/utils/date";
 
-function getFullImageUrl(imagePath: string | null | undefined) {
-  if (!imagePath) return '/default-profile.jpg'
-  if (imagePath.startsWith('/uploads/')) {
-    return `${process.env.NEXT_PUBLIC_BACKEND_URL}${imagePath}`
-  }
-  return imagePath
-}
 
 const Requests = () => {
-  const router = useRouter()
+  const router = useRouter();
+  const [requests, setRequests] = useState<any[]>([]);
+  const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [currentUserImage, setCurrentUserImage] = useState<string | null>(null);
+  const [processingRequests, setProcessingRequests] = useState<Set<string>>(new Set());
 
-  const [requests, setRequests] = useState<any[]>([])
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [email, setEmail] = useState<string | null>(null)
-  const [showMatch, setShowMatch] = useState(false)
-  const [matchedProfile, setMatchedProfile] = useState<any>(null)
-  const [requestToRemoveAfterMatch, setRequestToRemoveAfterMatch] = useState<string | null>(null)
-
-  // Load current user email from localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem('pairupUser')
+    const storedUser = localStorage.getItem("pairupUser");
     if (storedUser) {
       try {
-        const parsed = JSON.parse(storedUser)
-        if (parsed?.email) setEmail(parsed.email.toLowerCase())
+        const parsed = JSON.parse(storedUser);
+        if (parsed?.email) {
+          const userEmail = parsed.email.toLowerCase();
+          setEmail(userEmail);
+          if (parsed?._id) {
+            setUserId(parsed._id);
+            fetchCurrentUserProfile(parsed._id);
+          }
+        }
       } catch {
-        toast.error('Error parsing user info')
+        toast.error("Error parsing user info");
       }
     } else {
-      toast.error('Please log in')
-      router.push('/login')
+      toast.error("Please log in");
+      router.push("/login");
     }
-  }, [router])
+  }, [router]);
 
-  // Fetch requests for current user
+  const fetchCurrentUserProfile = async (userIdParam: string) => {
+    try {
+      const res = await api.get(`/api/user/profile/${userIdParam}`);
+      if (res.data?.photo) {
+        setCurrentUserImage(res.data.photo);
+      }
+    } catch (error) {
+      console.error("Error fetching current user profile:", error);
+    }
+  };
+
+  const fetchRequests = async () => {
+    if (!email) return;
+    
+    try {
+      const res = await api.get(`/matches/notifications`, { params: { email } });
+      
+      // Filter notifications
+      let filtered = res.data.filter(
+        (n: any) =>
+          ["request", "match", "request_accepted"].includes(n.type) &&
+          n.to?.toLowerCase() === email
+      );
+
+      // Remove duplicate notifications - keep only the latest type for each sender
+      const notificationMap = new Map();
+      filtered.forEach((n: any) => {
+        const key = n.from?.toLowerCase();
+        if (!notificationMap.has(key)) {
+          notificationMap.set(key, n);
+        } else {
+          const existing = notificationMap.get(key);
+          // Priority: match > request_accepted > request
+          if (n.type === 'match' || 
+              (n.type === 'request_accepted' && existing.type === 'request')) {
+            notificationMap.set(key, n);
+          }
+        }
+      });
+
+      // Convert back to array and sort by date (newest first)
+      filtered = Array.from(notificationMap.values()).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setRequests(filtered);
+    } catch {
+      toast.error("Failed to load requests");
+    }
+  };
+
   useEffect(() => {
-    if (!email) return
+    if (!email) return;
+    fetchRequests();
+  }, [email]);
 
-    const fetchRequests = async () => {
-      try {
-        const res = await api.get(`/matches/notifications`, { params: { email } })
-        // Only requests where type is 'request' and to is current user
-        const filtered = res.data.filter(
-          (n: any) => n.type === 'request' && n.to?.toLowerCase() === email
-        )
-        setRequests(filtered)
-        setCurrentIndex(0)
-      } catch {
-        toast.error('Failed to load requests')
-      }
-    }
-
-    fetchRequests()
-  }, [email])
-
-  const currentRequest = requests[currentIndex]
-
-  const handleLikeBack = async () => {
-    if (!currentRequest) return
+  const handleAccept = async (request: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (processingRequests.has(request._id)) return;
+    setProcessingRequests((prev) => new Set(prev).add(request._id));
 
     try {
-      const res = await api.post('/matches/swipe', {
+      const res = await api.post("/matches/swipe", {
         swiper_email: email,
-        target_email: currentRequest.from,
+        target_email: request.from,
         liked: true,
-      })
+      });
 
-      if (res.data.match) {
-        setMatchedProfile({
-          name: currentRequest.sender_name,
-          images: [getFullImageUrl(currentRequest.sender_image)],
-          userImage: getFullImageUrl(currentRequest.user_image),
-        })
-        setShowMatch(true)
-        setRequestToRemoveAfterMatch(currentRequest._id)
+      const isMatch = res.data.match;
+
+      if (isMatch) {
+        toast.success(`It's a Match with ${request.sender_name}!`);
       } else {
-        // Remove this request from list and update index
-        const updated = requests.filter(r => r._id !== currentRequest._id)
-        setRequests(updated)
-        setCurrentIndex(prev => Math.min(prev, updated.length - 1))
-        toast.success('Interest sent!')
+        toast.success(`You are now matched with ${request.sender_name}!`);
       }
-    } catch {
-      toast.error('Failed to send interest')
-    }
-  }
 
-  const handleIgnore = async () => {
-    if (!currentRequest) return
+      // Auto-refresh requests after 500ms to show updated state
+      setTimeout(() => {
+        fetchRequests();
+      }, 500);
+      
+    } catch {
+      toast.error("Failed to accept request");
+    } finally {
+      setProcessingRequests((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(request._id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleReject = async (request: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (processingRequests.has(request._id)) return;
+    setProcessingRequests((prev) => new Set(prev).add(request._id));
+
     try {
-      await api.delete(`/matches/ignore/${currentRequest._id}`)
-      const updated = requests.filter(r => r._id !== currentRequest._id)
-      setRequests(updated)
-      setCurrentIndex(prev => Math.min(prev, updated.length - 1))
-      toast.success('Request ignored')
+      await api.delete(`/matches/ignore/${request._id}`);
+      setRequests((prev) => prev.filter((r) => r._id !== request._id));
+      toast.success("Request rejected");
     } catch {
-      toast.error('Failed to ignore request')
+      toast.error("Failed to reject request");
+    } finally {
+      setProcessingRequests((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(request._id);
+        return newSet;
+      });
     }
-  }
+  };
 
-  const closeMatchModal = () => {
-    setShowMatch(false)
-    setMatchedProfile(null)
-    if (requestToRemoveAfterMatch) {
-      const updated = requests.filter(r => r._id !== requestToRemoveAfterMatch)
-      setRequests(updated)
-      setCurrentIndex(prev => Math.min(prev, updated.length - 1))
-      setRequestToRemoveAfterMatch(null)
+  const handleViewProfile = (request: any) => {
+    if (processingRequests.has(request._id)) return;
+    if (request.sender_id) {
+      sessionStorage.setItem("lastViewedProfile", request.from);
+      sessionStorage.setItem("returningFromProfile", "true");
+      router.push(`/user/${request.sender_id}`);
+    } else {
+      toast.error("User ID not found");
     }
-  }
+  };
 
-  const onSmallCardClick = (idx: number) => {
-    setCurrentIndex(idx)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  if (!email) return <div className="text-center py-10">Loading user...</div>
-  if (requests.length === 0)
-    return <div className="text-center py-10">No requests at the moment.</div>
+  if (!email) return <div className="text-center py-10">Loading user...</div>;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto">
-      {/* Main Request Card */}
-      <div className="flex-1 flex justify-center">
-        <Card className="w-2/5 max-w-xl overflow-hidden shadow-2xl border-0 bg-white rounded-3xl">
-          <div
-            className="relative cursor-pointer"
-            onClick={() => {
-              if (currentRequest.sender_id) router.push(`/user/${currentRequest.sender_id}`)
-              else toast.error('User ID not found')
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                if (currentRequest.sender_id) router.push(`/user/${currentRequest.sender_id}`)
-              }
-            }}
-          >
-            <img
-              src={getFullImageUrl(currentRequest.sender_image)}
-              alt={currentRequest.sender_name}
-              className="w-full h-96 object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none">
-              <h2 className="text-3xl font-bold mb-2">
-                {currentRequest.sender_name}, {currentRequest.sender_age}
-              </h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span>{(currentRequest.sender_location || '').split(' ').slice(0, 2).join(' ')}</span>
-                </div>
-                {currentRequest.sender_profession && (
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="w-4 h-4" />
-                    <span>{currentRequest.sender_profession}</span>
-                  </div>
-                )}
-                {currentRequest.sender_education && (
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4" />
-                    <span>{currentRequest.sender_education}</span>
-                  </div>
-                )}
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Match Requests and Notifications</h1>
+      {requests.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">No requests yet</div>
+      ) : (
+        <div className="space-y-2">
+          {requests.map((request) => {
+            const isProcessing = processingRequests.has(request._id);
+            const isAccepted = request.type === "request_accepted";
+            const isMatch = request.type === "match";
 
-                <div className="flex items-center space-x-2">
-                  <Badge
-                    className={`text-xs px-2 py-1 text-white ${
-                      currentRequest.compatibility_score >= 90
-                        ? 'bg-green-700'
-                        : currentRequest.compatibility_score >= 80
-                        ? 'bg-green-600'
-                        : currentRequest.compatibility_score >= 70
-                        ? 'bg-green-500'
-                        : currentRequest.compatibility_score >= 60
-                        ? 'bg-yellow-500'
-                        : currentRequest.compatibility_score >= 50
-                        ? 'bg-yellow-400'
-                        : currentRequest.compatibility_score >= 40
-                        ? 'bg-orange-400'
-                        : currentRequest.compatibility_score >= 30
-                        ? 'bg-orange-500'
-                        : currentRequest.compatibility_score >= 20
-                        ? 'bg-red-500'
-                        : 'bg-red-600'
-                    }`}
-                  >
-                    {currentRequest.compatibility_score}% Compatible
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-          <CardContent className="p-6">
-            <p className="text-gray-700 mb-4 leading-relaxed">
-              {currentRequest.message || 'This user liked your profile!'}
-            </p>
-
-            {Array.isArray(currentRequest.sender_hobbies) && currentRequest.sender_hobbies.length > 0 && (
-              <div className="mt-4 mb-6">
-                <h3 className="font-semibold text-gray-800 mb-2">Hobbies</h3>
-                <div className="flex flex-wrap gap-2">
-                  {currentRequest.sender_hobbies.map((hobby: string, i: number) => (
-                    <span
-                      key={i}
-                      className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-sm font-medium"
-                    >
-                      {hobby}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-center gap-6 mt-4">
-              <Button
-                onClick={handleIgnore}
-                variant="outline"
-                className="w-14 h-14 rounded-full border-gray-300 hover:border-red-500"
-              >
-                <X className="w-6 h-6 text-red-500" />
-              </Button>
-
-              <Button
-                onClick={handleLikeBack}
-                className="w-14 h-14 rounded-full bg-pink-500 hover:bg-pink-600 text-white"
-              >
-                <Heart className="w-6 h-6" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Requests List (Small Cards) */}
-      <div className="w-full lg:w-[210px] space-y-6 overflow-y-auto max-h-[600px]">
-        {requests.map((req, idx) => (
-          <div
-            key={req._id}
-            className={`cursor-pointer rounded-lg overflow-hidden shadow-md  transition bg-white flex items-center gap-4 p-3 ${
-              idx === currentIndex ? 'ring-2 ring-gray-500' : ''
-            }`}
-            onClick={() => onSmallCardClick(idx)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') onSmallCardClick(idx)
-            }}
-          >
-            <img
-              src={getFullImageUrl(req.sender_image)}
-              alt={req.sender_name}
-              className="w-16 h-16 object-cover rounded-lg"
-            />
-            <div className="flex flex-col">
-              <h3 className="font-semibold text-base">{req.sender_name}</h3>
-              <p className="text-xs text-gray-600">
-                {req.sender_age} &middot; {(req.sender_location || '').split(' ').slice(0, 2).join(' ')}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Match Modal */}
-      {showMatch && matchedProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center relative shadow-2xl">
-            <button
-              onClick={closeMatchModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              aria-label="Close match modal"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            <div className="mb-6">
-              <div className="w-24 h-24 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <Heart className="w-12 h-12 text-white" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">It's a Match!</h2>
-              <p className="text-gray-600">You and {matchedProfile.name} have liked each other</p>
-            </div>
-
-            <div className="flex items-center justify-center mb-6 space-x-4">
-              {/* You */}
-              <div className="flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-blue-200">
-                  {matchedProfile.userImage ? (
-                    <img
-                      src={matchedProfile.userImage}
-                      alt="You"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                      You
-                    </div>
-                  )}
-                </div>
-                <span className="mt-1 text-sm text-gray-600">You</span>
-              </div>
-
-              <Heart className="w-8 h-8 text-rose-500 animate-pulse" />
-
-              {/* Match */}
-              <div className="flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-pink-200">
-                  {matchedProfile.images?.[0] ? (
-                    <img
-                      src={matchedProfile.images[0]}
-                      alt={matchedProfile.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm">
-                      Match
-                    </div>
-                  )}
-                </div>
-                <span className="mt-1 text-sm text-gray-600">{matchedProfile.name}</span>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Button
+            return (
+              <div
+                key={request._id}
                 onClick={() => {
-                  router.push('/chat')
-                  closeMatchModal()
+                  if (!isAccepted && !isMatch) handleViewProfile(request);
                 }}
-                className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-semibold py-3 rounded-xl"
+                className={`bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 ${
+                  !isAccepted && !isMatch ? "cursor-pointer" : ""
+                } border border-gray-100 ${
+                  isMatch
+                    ? "border-green-300 bg-green-50"
+                    : isAccepted
+                    ? "border-green-200 bg-green-50"
+                    : "hover:border-pink-200"
+                } ${isProcessing ? "opacity-60 pointer-events-none" : ""}`}
               >
-                <MessageCircle className="w-5 h-5 mr-2" />
-                Start Chat
-              </Button>
-              <Button variant="outline" onClick={closeMatchModal} className="w-full">
-                Keep Swiping
-              </Button>
-            </div>
-          </div>
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    {/* Profile Image */}
+                    <div className="relative flex-shrink-0">
+                      <div
+                        className={`w-14 h-14 rounded-full overflow-hidden ring-2 ${
+                          isAccepted || isMatch ? "ring-green-300" : "ring-pink-100"
+                        }`}
+                      >
+                        <img
+                          src={getFullImageUrl(request.sender_image)}
+                          alt={request.sender_name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div
+                        className={`absolute -bottom-1 -right-1 w-6 h-6 ${
+                          isAccepted || isMatch
+                            ? "bg-gradient-to-r from-green-500 to-emerald-500"
+                            : "bg-gradient-to-r from-pink-500 to-rose-500"
+                        } rounded-full flex items-center justify-center shadow-lg`}
+                      >
+                        {isAccepted || isMatch ? (
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        ) : (
+                          <Heart className="w-3.5 h-3.5 text-white fill-white" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-2">
+                        <p className="text-gray-900 text-sm leading-relaxed">
+                          {isAccepted || isMatch ? (
+                            <>
+                              <span className="font-semibold hover:underline">
+                                You
+                              </span>
+                              {" and "}
+                              <span className="font-semibold hover:underline">
+                                {request.sender_name || request.from}
+                              </span>
+                              {" are a match now! 🎉"}
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-semibold hover:underline">
+                                {request.sender_name || request.from}
+                              </span>
+                              {" liked your profile!"}
+                            </>
+                          )}
+                        </p>
+
+                        {request.type === "request" &&
+                          (request.compatibility_score || request.score) && (
+                            <Badge
+                              className={`mt-1.5 text-xs px-2 py-0.5 text-white font-semibold ${getCompatibilityColor(
+                                request.compatibility_score || request.score
+                              )}`}
+                            >
+                              {Math.round(
+                                request.compatibility_score || request.score
+                              )}
+                              % Compatible
+                            </Badge>
+                          )}
+
+                        {!isMatch && !isAccepted && request.message && (
+                          <p className="text-sm text-gray-600 mt-2 line-clamp-2 italic">
+                            "{request.message}"
+                          </p>
+                        )}
+
+                        <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                          {request.sender_location && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              <span>
+                                {(request.sender_location || "")
+                                  .split(" ")
+                                  .slice(0, 2)
+                                  .join(" ")}
+                              </span>
+                            </div>
+                          )}
+                          {request.sender_profession && (
+                            <div className="flex items-center gap-1">
+                              <Briefcase className="w-3 h-3" />
+                              <span>{request.sender_profession}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      {!isAccepted && !isMatch && (
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            onClick={(e) => handleAccept(request, e)}
+                            size="sm"
+                            disabled={isProcessing}
+                            className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white border-0 rounded-lg h-8 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isProcessing ? (
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5 mr-1" />
+                            )}
+                            Accept
+                          </Button>
+
+                          <Button
+                            onClick={(e) => handleReject(request, e)}
+                            size="sm"
+                            variant="outline"
+                            disabled={isProcessing}
+                            className="flex-1 rounded-lg border-gray-300 hover:bg-gray-50 text-gray-700 h-8 text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <X className="w-3.5 h-3.5 mr-1" />
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+
+                      {(isAccepted || isMatch) && (
+                        <div className="mt-3">
+                          <Button
+                            onClick={() => router.push("/chat")}
+                            size="sm"
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 rounded-lg h-8 text-xs font-semibold"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 mr-1" />
+                            Send Message
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Timestamp */}
+                    <div className="flex-shrink-0 flex items-start gap-1 text-xs text-gray-400">
+                      <Clock className="w-3 h-3 mt-0.5" />
+                      <span>{getTimeAgoKathmandu(request.created_at || new Date())}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default Requests
+export default Requests;

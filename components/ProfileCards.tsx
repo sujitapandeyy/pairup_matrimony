@@ -1,55 +1,141 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { Heart, X, MapPin, Briefcase, GraduationCap } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  Heart,
+  X,
+  MapPin,
+  Briefcase,
+  GraduationCap,
+  Loader2,
+  Star,
+} from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { Badge } from "./ui/badge";
 
-const ProfileCards = () => {
+// Types
+interface Profile {
+  id?: string;
+  email: string;
+  name: string;
+  age: number;
+  profession?: string;
+  location?: string;
+  education?: string;
+  images?: string[];
+  hobbies?: string[];
+  compatibility_score?: number;
+  distance_km?: number;
+}
+
+interface User {
+  email: string;
+}
+
+// Constants
+const MAX_SUGGESTED_PROFILES = 5;
+const MAX_NEARBY_PROFILES = 6;
+const DEFAULT_IMAGE = "/default-profile.jpg";
+
+// Helper functions
+const getCompatibilityColor = (score: number): string => {
+  if (score >= 90) return "bg-emerald-600";
+  if (score >= 80) return "bg-green-600";
+  if (score >= 70) return "bg-lime-600";
+  if (score >= 60) return "bg-yellow-500";
+  if (score >= 50) return "bg-amber-500";
+  if (score >= 40) return "bg-orange-500";
+  if (score >= 30) return "bg-orange-600";
+  if (score >= 20) return "bg-red-500";
+  return "bg-red-700";
+};
+
+const formatLocation = (location: string | undefined): string => {
+  if (!location) return "Unknown";
+  return location.split(" ").slice(0, 2).join(" ");
+};
+
+const getUsernameFromName = (name: string): string => {
+  return name.toLowerCase().replace(/\s+/g, "_");
+};
+
+const ProfileCards: React.FC = () => {
   const router = useRouter();
-  const [profiles, setProfiles] = useState<any[]>([]);
+
+  // State
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [email, setEmail] = useState<string | null>(null);
-  const [randomProfiles, setRandomProfiles] = useState<any[]>([]);
+  const [suggestedProfiles, setSuggestedProfiles] = useState<Profile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [nearbyProfiles, setNearbyProfiles] = useState<Profile[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(true);
 
+  // Initialize user from localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("pairupUser");
     if (storedUser) {
       try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed?.email) setEmail(parsed.email);
-      } catch {
-        toast.error("Error parsing user from localStorage");
+        const parsed: User = JSON.parse(storedUser);
+        if (parsed?.email) {
+          setEmail(parsed.email);
+        }
+      } catch (error) {
+        console.error("Error parsing user from localStorage:", error);
+        toast.error("Error loading user data");
       }
     }
   }, []);
 
-  const fetchSimilarProfiles = async () => {
+  // Fetch nearby profiles
+  const fetchNearbyProfiles = useCallback(async () => {
     if (!email) return;
+    setNearbyLoading(true);
 
     try {
       const res = await api.get(
-        `/matches/get_profiles?email=${encodeURIComponent(email)}`
+        `/matches/people_near_you?email=${encodeURIComponent(email)}`
       );
-      const allProfiles = res.data.profiles.filter(
-        (p: any) => p.email !== email
-      );
-      setProfiles(allProfiles);
 
+      const data = res.data;
+
+      if (data.candidates) {
+        setNearbyProfiles(data.candidates.slice(0, MAX_NEARBY_PROFILES));
+      }
+
+      if (data.skipped && data.skipped.length > 0) {
+        console.log("Skipped nearby profiles:", data.skipped);
+      }
+    } catch (error) {
+      console.error("Error fetching nearby profiles:", error);
+      toast.error("Failed to load nearby profiles");
+    } finally {
+      setNearbyLoading(false);
+    }
+  }, [email]);
+
+  useEffect(() => {
+    if (email) fetchNearbyProfiles();
+  }, [email, fetchNearbyProfiles]);
+
+  // Fetch suggested profiles
+  const fetchSuggestedProfiles = useCallback(
+    async (userEmail: string, allProfiles: Profile[]): Promise<Profile[]> => {
       try {
-        const simRes = await api.get(
-          `/matches/similar_to_liked?email=${encodeURIComponent(email)}`
+        const res = await api.get(
+          `/matches/similar_to_liked?email=${encodeURIComponent(userEmail)}`
         );
-        let similar = simRes.data || [];
+        let similar: Profile[] = res.data || [];
 
-        if (similar.length < 5) {
-          const remaining = 5 - similar.length;
+        if (similar.length < MAX_SUGGESTED_PROFILES) {
+          const remaining = MAX_SUGGESTED_PROFILES - similar.length;
           const availableProfiles = allProfiles.filter(
-            (p: any) => !similar.some((s: any) => s.email === p.email)
+            (p) => !similar.some((s) => s.email === p.email)
           );
           const random = [...availableProfiles]
             .sort(() => 0.5 - Math.random())
@@ -57,40 +143,76 @@ const ProfileCards = () => {
           similar = [...similar, ...random];
         }
 
-        setRandomProfiles(similar.slice(0, 5));
-      } catch {
-        const random = [...allProfiles]
+        return similar.slice(0, MAX_SUGGESTED_PROFILES);
+      } catch (error) {
+        console.error("Error fetching similar profiles:", error);
+        return [...allProfiles]
           .sort(() => 0.5 - Math.random())
-          .slice(0, 5);
-        setRandomProfiles(random);
+          .slice(0, MAX_SUGGESTED_PROFILES);
       }
+    },
+    []
+  );
 
-      // ✅ Restore last viewed profile if exists
+  // Fetch all profiles
+  const fetchProfiles = useCallback(async () => {
+    if (!email) return;
+
+    setIsLoading(true);
+    try {
+      const res = await api.get(
+        `/matches/get_profiles?email=${encodeURIComponent(email)}`
+      );
+      const allProfiles: Profile[] = res.data.profiles.filter(
+        (p: Profile) => p.email !== email
+      );
+
+      // Always sort by compatibility score (highest first)
+      const sortedProfiles = [...allProfiles].sort((a, b) => {
+        const scoreA = a.compatibility_score ?? 0;
+        const scoreB = b.compatibility_score ?? 0;
+        return scoreB - scoreA;
+      });
+      
+      setProfiles(sortedProfiles);
+
+      const suggested = await fetchSuggestedProfiles(email, sortedProfiles);
+      setSuggestedProfiles(suggested);
+
+      // Check if returning from profile page (has lastViewedProfile in sessionStorage)
       const lastViewed = sessionStorage.getItem("lastViewedProfile");
-      if (lastViewed) {
-        const idx = allProfiles.findIndex((p: any) => p.email === lastViewed);
+      const returningFromProfile = sessionStorage.getItem("returningFromProfile");
+      
+      if (lastViewed && returningFromProfile === "true") {
+        const idx = sortedProfiles.findIndex((p) => p.email === lastViewed);
         if (idx !== -1) {
           setCurrentIndex(idx);
+          // Clear the returning flag but keep lastViewedProfile
+          sessionStorage.removeItem("returningFromProfile");
           return;
         }
       }
 
-      // fallback
+      // Default to first profile (highest compatibility)
       setCurrentIndex(0);
-    } catch {
-      toast.error("Failed to fetch profiles");
+    } catch (error) {
+      console.error("Error fetching profiles:", error);
+      toast.error("Failed to load profiles");
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [email, fetchSuggestedProfiles]);
 
   useEffect(() => {
-    if (email) {
-      fetchSimilarProfiles();
-    }
-  }, [email]);
+    if (email) fetchProfiles();
+  }, [email, fetchProfiles]);
 
-  const handleSwipe = async (liked: boolean): Promise<void> => {
-    if (profiles.length === 0) return;
+  // Handle swipe
+  const handleSwipe = async (liked: boolean) => {
+    if (profiles.length === 0 || isSwiping) return;
+
     const targetProfile = profiles[currentIndex];
+    setIsSwiping(true);
 
     try {
       await api.post("/matches/swipe", {
@@ -99,7 +221,7 @@ const ProfileCards = () => {
         liked,
       });
 
-      liked ? toast.success("Interest sent!") : toast.info("Skipped.");
+      toast.success(liked ? "Interest sent! 💖" : "Passed");
 
       setProfiles((prev) => {
         const updated = prev.filter((_, idx) => idx !== currentIndex);
@@ -108,203 +230,322 @@ const ProfileCards = () => {
         return updated;
       });
 
-      if (liked) {
-        await fetchSimilarProfiles();
+      if (liked && email) {
+        const suggested = await fetchSuggestedProfiles(email, profiles);
+        setSuggestedProfiles(suggested);
       } else {
-        setRandomProfiles((prev) => {
-          let updated = prev.filter(
-            (profile) => profile.email !== targetProfile.email
-          );
-
-          if (updated.length < 5) {
+        setSuggestedProfiles((prev) => {
+          let updated = prev.filter((p) => p.email !== targetProfile.email);
+          if (updated.length < MAX_SUGGESTED_PROFILES) {
             const shownEmails = new Set([
               ...updated.map((p) => p.email),
               targetProfile.email,
             ]);
-
             const candidatesToAdd = profiles
               .filter((p) => !shownEmails.has(p.email))
               .sort(() => 0.5 - Math.random())
-              .slice(0, 5 - updated.length);
-
+              .slice(0, MAX_SUGGESTED_PROFILES - updated.length);
             updated = [...updated, ...candidatesToAdd];
           }
-
-          return updated.slice(0, 5);
+          return updated.slice(0, MAX_SUGGESTED_PROFILES);
         });
       }
-    } catch {
-      toast.error("Swipe failed");
+    } catch (error) {
+      console.error("Swipe error:", error);
+      toast.error("Failed to process swipe");
+    } finally {
+      setIsSwiping(false);
     }
   };
 
-  if (!email) return <div className="text-center py-10">Loading user...</div>;
+  // Navigate to profile in card view (not redirecting to profile page)
+  const navigateToProfile = useCallback(
+    (profile: Profile) => {
+      const idx = profiles.findIndex((p) => p.email === profile.email);
+      if (idx !== -1) {
+        setCurrentIndex(idx);
+      } else {
+        setProfiles((prev) => [...prev, profile]);
+        setCurrentIndex(profiles.length);
+      }
+      sessionStorage.setItem("lastViewedProfile", profile.email);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [profiles]
+  );
+
+  // View full profile - redirects to profile page
+  const viewFullProfile = useCallback(() => {
+    const currentProfile = profiles[currentIndex];
+    if (currentProfile?.id || currentProfile?.email) {
+      sessionStorage.setItem("lastViewedProfile", currentProfile.email);
+      sessionStorage.setItem("returningFromProfile", "true");
+      router.push(`/user/${currentProfile.id || currentProfile.email}`);
+    } else {
+      toast.error("Profile not found");
+    }
+  }, [currentIndex, profiles, router]);
+
+  // Open nearby profile directly in profile page
+  const openProfileDirectly = (profile: Profile) => {
+    sessionStorage.setItem("lastViewedProfile", profile.email);
+    sessionStorage.setItem("returningFromProfile", "true");
+    router.push(`/user/${profile.id || profile.email}`);
+  };
+
+  // Loading / empty states
+  if (isLoading)
+    return (
+      <div className="flex items-center justify-center min-h-[600px]">
+        <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
+      </div>
+    );
+
+  if (!email)
+    return (
+      <div className="text-center py-10 text-gray-600">
+        Please log in to view profiles
+      </div>
+    );
+
   if (profiles.length === 0)
-    return <div className="text-center py-10">No profiles found.</div>;
+    return (
+      <div className="text-center py-10">
+        <div className="text-gray-600 mb-4">No more profiles to show</div>
+        <Button onClick={fetchProfiles} variant="outline">
+          Refresh
+        </Button>
+      </div>
+    );
 
   const currentProfile = profiles[currentIndex];
 
-  const onSmallCardClick = (profile: any) => {
-    const idx = profiles.findIndex((p) => p.email === profile.email);
-    if (idx !== -1) {
-      setCurrentIndex(idx);
-      sessionStorage.setItem("lastViewedProfile", profile.email); // ✅ Save when selecting from sidebar
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      setProfiles((prev) => [...prev, profile]);
-      setCurrentIndex(profiles.length);
-      sessionStorage.setItem("lastViewedProfile", profile.email); // ✅ Save
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const onBigImageClick = () => {
-    if (currentProfile?.id || currentProfile?.email) {
-      sessionStorage.setItem("lastViewedProfile", currentProfile.email); // ✅ Save before navigating
-      router.push(`/user/${currentProfile.id || currentProfile.email}`);
-    } else {
-      toast.error("User identifier not found");
-    }
-  };
-
   return (
-    <div className="flex flex-col lg:flex-row gap-10 px-4 py-10 w-full max-w-screen-xl mx-auto">
-      <div className="flex-1 flex flex-col items-center gap-6">
-        <Card className="w-full max-w-sm overflow-hidden shadow-2xl border-0 bg-white rounded-3xl transform transition-transform hover:scale-[1.02]">
-          <div
-            className="relative cursor-pointer h-[600px]"
-            onClick={onBigImageClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') onBigImageClick()
-            }}
-          >
-            <img
-              src={currentProfile.images?.[0] || '/default-profile.jpg'}
-              alt={currentProfile.name}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none ">
-              <h2 className="text-3xl font-bold mb-3">
-                {currentProfile.name}, {currentProfile.age}
-              </h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span>{currentProfile.profession}</span>
+    <div className="flex flex-col gap-6 px-4 pb-8 w-full max-w-screen-xl mx-auto">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Profile Card */}
+        <div className="flex-1 flex flex-col items-center gap-6 ">
+          <div className="w-4/8  flex-1 flex flex-col items-center gap-6 rounded-3xl ml-50">
+            <Card className="p-2  max-w-md overflow-hidden shadow-2xl border-0 rounded-3xl transform transition-all duration-300 ">
+              <div
+                className="relative cursor-pointer h-[600px] group rounded-3xl"
+                onClick={viewFullProfile}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    viewFullProfile();
+                  }
+                }}
+              >
+                <img
+                  src={currentProfile.images?.[0] || DEFAULT_IMAGE}
+                  alt={currentProfile.name}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-101 rounded-3xl shadow-xl shadow-pink-100"
+                />
+
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent rounded-3xl transition-transform duration-500 group-hover:scale-101 " />
+
+                {/* Profile info overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none">
+                  <h2 className="text-3xl font-bold mb-3 drop-shadow-lg">
+                    {currentProfile.name}, {currentProfile.age}
+                  </h2>
+
+                  <div className="space-y-2.5 text-sm">
+                    {currentProfile.profession && (
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {currentProfile.profession}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {formatLocation(currentProfile.location)}
+                      </span>
+                    </div>
+
+                    {currentProfile.education && (
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {currentProfile.education}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Compatibility Badge */}
+                    {currentProfile.compatibility_score !== undefined && (
+                      <div className="flex items-center mt-3">
+                        <Badge
+                          className={`text-xs px-3 py-1.5 text-white font-semibold shadow-lg ${getCompatibilityColor(
+                            currentProfile.compatibility_score
+                          )}`}
+                        >
+                          {currentProfile.compatibility_score}% Compatible
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Hobbies */}
+                    {Array.isArray(currentProfile.hobbies) &&
+                      currentProfile.hobbies.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {currentProfile.hobbies
+                            .slice(0, 3)
+                            .map((hobby, i) => (
+                              <span
+                                key={i}
+                                className="bg-white/25 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-sm"
+                              >
+                                {hobby}
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    {/* Action Buttons */}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span>{(currentProfile.location || '').split(' ').slice(0, 2).join(' ')}</span>
+
+                {/* Click hint */}
+                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                  View Profile
                 </div>
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4" />
-                  <span>{currentProfile.education}</span>
-                </div>
-                <div className="flex items-center space-x-2 mt-3">
-                  <Badge
-                    className={`text-xs px-3 py-1 text-white ${
-                      currentProfile.compatibility_score >= 90
-                        ? 'bg-green-700'
-                        : currentProfile.compatibility_score >= 80
-                        ? 'bg-green-600'
-                        : currentProfile.compatibility_score >= 70
-                        ? 'bg-green-500'
-                        : currentProfile.compatibility_score >= 60
-                        ? 'bg-yellow-500'
-                        : currentProfile.compatibility_score >= 50
-                        ? 'bg-yellow-400'
-                        : currentProfile.compatibility_score >= 40
-                        ? 'bg-orange-400'
-                        : currentProfile.compatibility_score >= 30
-                        ? 'bg-orange-500'
-                        : currentProfile.compatibility_score >= 20
-                        ? 'bg-red-500'
-                        : 'bg-red-600'
+              </div>
+              <div className="flex justify-center gap-4 mt-5">
+                <Button
+                  onClick={() => handleSwipe(false)}
+                  disabled={isSwiping}
+                  variant="outline"
+                  className="w-16 h-16 rounded-full border-0 bg-white hover:bg-gray-50 shadow-lg shadow-red-100 hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSwiping ? (
+                    <Loader2 className="w-6 h-6 text-red-500 animate-spin" />
+                  ) : (
+                    <X className="w-6 h-6 text-red-500" />
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => handleSwipe(true)}
+                  disabled={isSwiping}
+                  className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white shadow-lg shadow-pink-100 hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border-0"
+                >
+                  {isSwiping ? (
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  ) : (
+                    <Heart className="w-6 h-6 fill-white" />
+                  )}
+                </Button>
+
+                <Button
+                  disabled={isSwiping}
+                  variant="outline"
+                  className="w-16 h-16 rounded-full border-0 bg-white hover:bg-gray-50 shadow-lg shadow-blue-100 hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Star className="w-6 h-6 text-purple-500" />
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-full lg:w-[360px] space-y-6">
+          {/* Suggested Users - Stories Style */}
+          <div className="p-2">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              Suggested for you
+            </h3>
+            <div className="flex gap-4 overflow-x-auto pb-2 ml-2 scrollbar-hide">
+              {suggestedProfiles.map((profile) => (
+                <div
+                  key={profile.email}
+                  className="flex flex-col items-center gap-2 cursor-pointer flex-shrink-0 group"
+                  onClick={() => navigateToProfile(profile)}
+                >
+                  <div
+                    className={`w-16 h-16 rounded-full p-[px] transition-all duration-300 ${
+                      currentProfile?.email === profile.email
+                        ? "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200 scale-105"
+                        : "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200"
                     }`}
                   >
-                    {currentProfile.compatibility_score}% Compatible
-                  </Badge>
-                </div>
-                {Array.isArray(currentProfile.hobbies) &&
-                  currentProfile.hobbies.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {currentProfile.hobbies.slice(0, 3).map((hobby: string, i: number) => (
-                        <span
-                          key={i}
-                          className="bg-white/20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-medium"
-                        >
-                          {hobby}
-                        </span>
-                      ))}
+                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden">
+                      <img
+                        src={profile.images?.[0] || DEFAULT_IMAGE}
+                        alt={profile.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
                     </div>
-                  )}
-              </div>
+                  </div>
+                  <span className="text-xs text-gray-700 max-w-[70px] truncate font-medium">
+                    {profile.name.split(" ")[0]}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
-        </Card>
-        
-        <div className="flex justify-center gap-6">
-          <Button
-            onClick={async (e) => {
-              e.preventDefault()
-              await handleSwipe(false)
-            }}
-            variant="outline"
-            className="w-16 h-16 rounded-full border-2 border-red-500 hover:bg-red-50 bg-white shadow-lg"
-          >
-            <X className="w-7 h-7 text-red-500" />
-          </Button>
 
-          <Button
-            onClick={async (e) => {
-              e.preventDefault()
-              await handleSwipe(true)
-            }}
-            className="w-16 h-16 rounded-full bg-pink-500 hover:bg-pink-600 text-white shadow-lg"
-          >
-            <Heart className="w-7 h-7 fill-white" />
-          </Button>
+          {/* People Near You */}
+          <div className="space-y-3  bg-white p-4 rounded-3xl">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              People Near you
+            </h3>
+            {nearbyLoading ? (
+              <p className="text-xs text-gray-500">Loading nearby people...</p>
+            ) : nearbyProfiles.length === 0 ? (
+              <p className="text-xs text-gray-500">No nearby people found</p>
+            ) : (
+              nearbyProfiles.map((profile) => (
+                <div
+                  key={profile.email}
+                  className="flex items-center justify-between group hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+                >
+                  <div
+                    className="flex items-center gap-3 cursor-pointer flex-1 min-w-0 space-y-5"
+                    onClick={() => navigateToProfile(profile)}
+                  >
+                    <img
+                      src={profile.images?.[0] || DEFAULT_IMAGE}
+                      alt={profile.name}
+                      className="w-11 h-11 rounded-full object-cover ring-2 ring-gray-100 group-hover:ring-pink-200 transition-all"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-gray-900 truncate">
+                        {getUsernameFromName(profile.name)}
+                      </h4>
+                      <p className="text-xs text-gray-500 truncate">
+                        {formatLocation(profile.location)}
+                      </p>
+                      {profile.distance_km && (
+                        <p className="text-xs text-gray-400">
+                          {profile.distance_km} km away
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openProfileDirectly(profile);
+                    }}
+                    className="text-xs font-semibold text-pink-600 hover:text-pink-700 bg-transparent hover:bg-transparent p-0 h-auto transition-colors"
+                  >
+                    View
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* Similar Users Sidebar */}
-      <div className="w-full lg:w-[290px] space-y-6 bg-white p-9 rounded-3xl">
-        <p className="font-bold text-gray-700">You might also Like :</p>
-        {randomProfiles.map((profile) => (
-          <div
-            key={profile.email}
-            className={`cursor-pointer rounded-lg overflow-hidden shadow-md hover:shadow-lg transition bg-white flex items-center gap-4 p-3 ${
-              profiles[currentIndex]?.email === profile.email
-                ? "ring-2 ring-gray-500"
-                : ""
-            }`}
-            onClick={() => onSmallCardClick(profile)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onSmallCardClick(profile);
-            }}
-          >
-            <img
-              src={profile.images?.[0] || "/default-profile.jpg"}
-              alt={profile.name}
-              className="w-16 h-16 object-cover rounded-lg"
-            />
-            <div className="flex flex-col">
-              <h3 className="font-semibold text-base">{profile.name}</h3>
-              <p className="text-xs text-gray-600">
-                {profile.age} &middot;{" "}
-                {(profile.location || "Unknown")
-                  .split(" ")
-                  .slice(0, 2)
-                  .join(" ")}
-              </p>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

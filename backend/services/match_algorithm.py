@@ -242,7 +242,6 @@ class MatchAlgorithm:
                 continue
 
             # --- ✅ Open to long distance fix ---
-            # --- ✅ Open to long distance fix ---
             if key == "open_to_long_distance":
                 u_pref = user_prefs.get("long_distance") or u_val
                 c_pref = candidate_prefs.get("long_distance") or c_val

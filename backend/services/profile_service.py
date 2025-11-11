@@ -25,18 +25,15 @@ class ProfileService:
 
     def get_user_by_id_or_email(self, user_id):
         mongo = current_app.mongo
-        user = None
         try:
             user_obj_id = ObjectId(user_id)
             user = mongo.db.users.find_one({"_id": user_obj_id})
         except Exception:
             user = mongo.db.users.find_one({"email": user_id})
+            user_obj_id = user["_id"] if user else None
+        return user, user_obj_id
 
-        if not user:
-            return None, None
-
-        return user, user["_id"]
-
+    # ---------------- PROFILE GET/UPDATE ---------------- #
     def get_profile(self, user_id):
         mongo = current_app.mongo
         user, user_obj_id = self.get_user_by_id_or_email(user_id)
@@ -60,7 +57,6 @@ class ProfileService:
                 "height": details.get("height"),
                 "caste": details.get("caste"),
                 "personality": details.get("personality"),
-                "hobbies": details.get("hobbies", []) if details else [],
                 "gender": details.get("gender"),
                 "location": details.get("location"),
                 "maritalStatus": details.get("marital_status"),
@@ -86,20 +82,11 @@ class ProfileService:
 
         details_update = {}
         fields = {
-            "age": "age",
-            "height": "height",
-            "caste": "caste",
-            "gender": "gender",
-            "location": "location",
-            "maritalStatus": "marital_status",
-            "religion": "religion",
-            "education": "education",
-            "profession": "profession",
-            "caption": "caption",
-            "personality": "personality",
-            "hobbies": "hobbies",
-            "latitude": "latitude", 
-            "longitude": "longitude"
+            "age": "age", "height": "height", "caste": "caste", "gender": "gender",
+            "location": "location", "maritalStatus": "marital_status",
+            "religion": "religion", "education": "education", "profession": "profession",
+            "caption": "caption", "personality": "personality", "hobbies": "hobbies",
+            "latitude": "latitude", "longitude": "longitude"
         }
         for key, db_key in fields.items():
             if key in data:
@@ -121,6 +108,7 @@ class ProfileService:
 
         return self.get_profile(str(user_obj_id))
 
+    # ---------------- MAIN PROFILE PHOTO ---------------- #
     def upload_photo(self, user_id, file):
         mongo = current_app.mongo
         validation_error = self.validate_file(file)
@@ -142,26 +130,104 @@ class ProfileService:
         try:
             file.save(filepath)
             photo_url = f"/uploads/{filename}"
-            mongo.db.users.update_one(
-                {"_id": user_obj_id},
-                {"$set": {"photo": photo_url}}
-            )
-
-            return jsonify({
-                "success": True,
-                "photoUrl": photo_url,
-                "message": "Profile photo updated successfully"
-            }), 200
-
+            mongo.db.users.update_one({"_id": user_obj_id}, {"$set": {"photo": photo_url}})
+            return jsonify({"success": True, "photoUrl": photo_url}), 200
         except Exception as e:
             current_app.logger.error(f"Photo upload failed: {e}")
             if os.path.exists(filepath):
                 os.remove(filepath)
             return jsonify({"error": "Failed to upload image"}), 500
 
+    # ---------------- GALLERY PHOTOS ---------------- #
+    def upload_gallery_photo(self, user_id, file):
+        mongo = current_app.mongo
+        validation_error = self.validate_file(file)
+        if validation_error:
+            return jsonify({"error": validation_error}), 400
+
+        user, user_obj_id = self.get_user_by_id_or_email(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = secure_filename(f"gallery_{user_obj_id}_{timestamp}.{ext}")
+
+        upload_folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
+        os.makedirs(upload_folder, exist_ok=True)
+        filepath = os.path.join(upload_folder, filename)
+
+        try:
+            file.save(filepath)
+            photo_url = f"/uploads/{filename}"
+
+            mongo.db.images.insert_one({
+                "user_id": user_obj_id,
+                "filepath": photo_url,
+                "uploaded_at": datetime.utcnow()
+            })
+
+            return jsonify({
+                "success": True,
+                "path": photo_url,
+                "message": "Gallery photo uploaded successfully"
+            }), 200
+        except Exception as e:
+            current_app.logger.error(f"Gallery upload failed: {e}")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            return jsonify({"error": "Failed to upload gallery photo"}), 500
+
+    def get_gallery(self, user_id):
+        mongo = current_app.mongo
+        user, user_obj_id = self.get_user_by_id_or_email(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        images = list(mongo.db.images.find({"user_id": user_obj_id}).sort("uploaded_at", -1))
+        for img in images:
+            img["_id"] = str(img["_id"])
+        return jsonify(images), 200
+
+    # ---------------- FILE SERVING ---------------- #
     def serve_uploaded_file(self, filename):
         upload_folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
         try:
             return send_from_directory(upload_folder, filename)
         except FileNotFoundError:
             return jsonify({"error": "File not found"}), 404
+        
+
+
+    # ---------------- DELETE GALLERY PHOTO ---------------- #
+    def delete_gallery_photo(self, user_id, image_id):
+        from bson.objectid import ObjectId
+        mongo = current_app.mongo
+
+        user, user_obj_id = self.get_user_by_id_or_email(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        try:
+            image_obj_id = ObjectId(image_id)
+        except Exception:
+            return jsonify({"error": "Invalid image ID"}), 400
+
+        image = mongo.db.images.find_one({"_id": image_obj_id, "user_id": user_obj_id})
+        if not image:
+            return jsonify({"error": "Image not found or does not belong to user"}), 404
+
+        # Delete file
+        upload_folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
+        filename = os.path.basename(image["filepath"])
+        file_path = os.path.join(upload_folder, filename)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                current_app.logger.warning(f"Failed to remove file: {e}")
+
+        # Delete from DB
+        mongo.db.images.delete_one({"_id": image_obj_id})
+
+        return jsonify({"success": True, "message": "Image deleted successfully"}), 200

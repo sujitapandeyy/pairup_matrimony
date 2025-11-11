@@ -124,6 +124,17 @@ def similar_to_liked():
         return jsonify(results), 200
 
 
+@match_bp.route("/people_near_you", methods=["GET"])
+def people_near_you():
+    email = request.args.get("email")
+    if not email:
+        return jsonify({"error": "Missing email"}), 400
+
+    service = MatchService(current_app.mongo.db)
+    results = service.get_people_near_you(email, request)
+    return jsonify(results), 200
+
+
 # def _calculate_trait_similarity(self, traits1, traits2):
 #     if not traits1 or not traits2:
 #         return 0

@@ -1,17 +1,17 @@
 'use client';
 
-import React, { ChangeEvent } from "react";
+import React, { ChangeEvent, useRef } from "react";
 import dynamic from 'next/dynamic';
 import { Heart, Camera, Check, Briefcase, Users } from "lucide-react";
 import { Profile } from "./types";
 import { toast } from 'sonner';
-import { Single_Day } from "next/font/google";
 
 const LocationInput = dynamic(() => import('@/components/LocationInput'), { ssr: false });
 
 interface EditProfileProps {
   profile: Profile;
-  formData: Partial<Profile>;
+  // NOTE: formData is expected to contain lookingFor.xyz fields
+  formData: Partial<Profile>; 
   onCancel: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onPhotoChange: (e: ChangeEvent<HTMLInputElement>) => void;
@@ -19,6 +19,7 @@ interface EditProfileProps {
   uploadingPhoto: boolean;
   uploadError: string | null;
   photoPreview: string | null;
+  showOnlyLookingFor?: boolean;
 }
 
 const genderOptions = ["Male", "Female", "Any"];
@@ -31,6 +32,24 @@ const educationOptions = ["High School", "Diploma", "Bachelor's", "Master's", "P
 const familyTypeOptions = ["Joint", "Nuclear"];
 const ageGroupOptions = Array.from({ length: 50 - 18 + 1 }, (_, i) => String(18 + i));
 
+// Helper function to get nested value from formData
+const getNestedValue = (obj: Partial<Profile>, path: string): string | undefined => {
+    const parts = path.split('.');
+    let current = obj as any;
+    for (const part of parts) {
+        // Handle array and null checks safely
+        if (!current || typeof current !== 'object' || !(part in current)) {
+            return undefined;
+        }
+        current = current[part];
+    }
+    // Convert array (like caste) to string, otherwise return string of the value
+    if (Array.isArray(current)) {
+        return current.join(', ');
+    }
+    return (current !== null && current !== undefined) ? String(current) : undefined;
+};
+
 export default function EditProfile({
   profile, 
   formData,
@@ -41,25 +60,44 @@ export default function EditProfile({
   uploadingPhoto,
   uploadError,
   photoPreview,
+  showOnlyLookingFor = false,
 }: EditProfileProps) {
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const handlePhotoClick = () => fileInputRef.current?.click();
 
   // --- Range selector for Age & Height ---
-  const renderRangeSelect = (label: string, fromName: string, toName: string, options: string[], parentName?: string) => {
-    const fromValue = formData[fromName as keyof typeof formData] as string || "";
-    const toValue = formData[toName as keyof typeof formData] as string || "";
+  const renderRangeSelect = (label: string, fromName: string, toName: string, options: string[], parentName: string) => {
+    
+    // 1. Try to read individual 'from' and 'to' values (e.g., lookingFor.age_from)
+    let fromValue = getNestedValue(formData, fromName) || "";
+    let toValue = getNestedValue(formData, toName) || "";
+    
+    // 2. If individual values are missing, try parsing the combined field (e.g., lookingFor.age_group: "25-30")
+    if (!fromValue && !toValue) {
+      const parentValue = getNestedValue(formData, parentName);
+      if (parentValue && typeof parentValue === 'string' && (parentValue.includes('-') || parentValue.includes('–'))) {
+        // Use a regex to split by either hyphen or en dash, or simply split by hyphen/en dash and clean.
+        const parts = parentValue.split(/[-–]/).map(p => p.trim());
+        if (parts.length === 2) {
+          // ENSURE PARSED VALUE IS IN THE OPTIONS LIST BEFORE SETTING
+          const partFrom = parts[0];
+          const partTo = parts[1];
+          
+          fromValue = options.includes(partFrom) ? partFrom : "";
+          toValue = options.includes(partTo) ? partTo : "";
+        }
+      }
+    }
 
     const handleChange = (from: string, to: string) => {
-      if (parentName) {
-        onFormChange({ target: { name: fromName, value: from } } as any);
-        onFormChange({ target: { name: toName, value: to } } as any);
-        onFormChange({ target: { name: parentName, value: from && to ? `${from}-${to}` : from || to || "" } } as any);
-      } else {
-        onFormChange({ target: { name: fromName, value: from } } as any);
-        onFormChange({ target: { name: toName, value: to } } as any);
-        onFormChange({ target: { name: label.toLowerCase().replace(' ', '_'), value: from && to ? `${from}-${to}` : from || to || "" } } as any);
-      }
+      // 3. Update individual from/to fields
+      onFormChange({ target: { name: fromName, value: from } } as any);
+      onFormChange({ target: { name: toName, value: to } } as any);
+
+      // 4. Update the combined parent field
+      const combinedValue = from && to ? `${from}-${to}` : from || to || "";
+      onFormChange({ target: { name: parentName, value: combinedValue } } as any);
     }
 
     return (
@@ -67,16 +105,15 @@ export default function EditProfile({
         <label className="block text-sm font-semibold text-gray-700">{label}</label>
         <div className="flex gap-3">
           <select
-            className="w-1/2 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-gray-50"
+            className="w-1/2 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 bg-gray-50"
             value={fromValue}
             onChange={(e) => handleChange(e.target.value, toValue)}
           >
             <option value="">From</option>
             {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
-
           <select
-            className="w-1/2 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-gray-50"
+            className="w-1/2 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 bg-gray-50"
             value={toValue}
             onChange={(e) => handleChange(fromValue, e.target.value)}
           >
@@ -88,7 +125,6 @@ export default function EditProfile({
     )
   }
 
-  // --- Pill-style checkbox list for Caste ---
   const renderCastePills = (selectedCastes: string[], parentName: string) => (
     <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
       {casteOptions.map(caste => {
@@ -114,7 +150,6 @@ export default function EditProfile({
     </div>
   );
 
-  // --- Helpers to parse caste string/array ---
   const getCasteArray = (value: any) => {
     if (Array.isArray(value)) return value;
     if (typeof value === 'string') return value.split(',').map(s => s.trim()).filter(Boolean);
@@ -123,76 +158,78 @@ export default function EditProfile({
 
   return (
     <form onSubmit={onSubmit} className="space-y-8">
-      {/* Profile Photo */}
-      <div className="bg-white rounded-2xl shadow-lg p-8">
-        <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <Camera className="h-6 w-6 text-blue-500" />
-          Profile Photo
-        </h3>
-        <div className="flex flex-col items-center">
-          <div className="relative mb-4">
-            <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100">
-              <img src={photoPreview || "/default-profile.png"} alt="Profile preview" className="w-full h-full object-cover"/>
-              {uploadingPhoto && <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-              </div>}
+      {!showOnlyLookingFor && (
+        <>
+          {/* Profile Photo */}
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <Camera className="h-6 w-6 text-blue-500" />
+              Profile Photo
+            </h3>
+            <div className="flex flex-col items-center">
+              <div className="relative mb-4">
+                <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-100">
+                  <img src={photoPreview || profile.photo || "/default-profile.png"} alt="Profile preview" className="w-full h-full object-cover"/>
+                  {uploadingPhoto && <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>}
+                </div>
+                <button type="button" onClick={handlePhotoClick} disabled={uploadingPhoto} className={`absolute bottom-0 right-0 rounded-full p-2 shadow-lg ${uploadingPhoto ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`}>
+                  <Camera className="h-5 w-5 text-white" />
+                </button>
+                <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={onPhotoChange} disabled={uploadingPhoto}/>
+              </div>
+              {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
             </div>
-            <button type="button" onClick={handlePhotoClick} disabled={uploadingPhoto} className={`absolute bottom-0 right-0 rounded-full p-2 cursor-pointer transition-all duration-200 shadow-lg ${uploadingPhoto ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'}`} title="Change Profile Photo">
-              <Camera className="h-5 w-5 text-white" />
-            </button>
-            <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={onPhotoChange} disabled={uploadingPhoto}/>
           </div>
-          {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
-          <p className="text-gray-500 text-sm mt-2">Click the camera icon to upload a new photo (max 5MB)</p>
-        </div>
-      </div>
 
-      {/* Personal Info */}
-      <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
-        <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <Users className="h-6 w-6 text-pink-500" />
-          Personal Information
-        </h3>
-        <InputField label="Full Name" name="name" value={formData.name ?? ""} onChange={onFormChange} />
-        <SelectField label="Age" name="age" value={formData.age ?? ""} onChange={onFormChange} options={ageGroupOptions} /> 
-        <SelectField label="Height" name="height" value={formData.height ?? ""} onChange={onFormChange} options={heightOptions} />
-        <SelectField label="Gender" name="gender" value={formData.gender ?? ""} onChange={onFormChange} options={genderOptions} />
-        <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">Caste</label>
-          {renderCastePills(getCasteArray(formData.caste), 'caste')}
-        </div>
-        <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
-        <TextAreaField label="About Me" name="caption" value={formData.caption ?? ""} onChange={onFormChange} placeholder="Tell us about yourself..." />
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">Location</label>
-          <LocationInput value={formData.location || ''} onSelect={(loc) => {
-            onFormChange({ target: { name: 'location', value: loc.display_name } } as any)
-            onFormChange({ target: { name: 'latitude', value: loc.lat } } as any)
-            onFormChange({ target: { name: 'longitude', value: loc.lon } } as any)
-          }} />
-        </div>
-      </div>
+          {/* Personal Info */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <Users className="h-6 w-6 text-pink-500" /> Personal Information
+            </h3>
+            <InputField label="Full Name" name="name" value={formData.name ?? ""} onChange={onFormChange} />
+            <SelectField label="Age" name="age" value={formData.age ?? ""} onChange={onFormChange} options={ageGroupOptions} /> 
+            <SelectField label="Height" name="height" value={formData.height ?? ""} onChange={onFormChange} options={heightOptions} />
+            <SelectField label="Gender" name="gender" value={formData.gender ?? ""} onChange={onFormChange} options={genderOptions} />
+            <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">Caste</label>
+              {renderCastePills(getCasteArray(formData.caste), 'caste')}
+            </div>
+            <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
+            <TextAreaField label="About Me" name="caption" value={formData.caption ?? ""} onChange={onFormChange} placeholder="Tell us about yourself..." />
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">Location</label>
+              <LocationInput value={formData.location || ''} onSelect={(loc) => {
+                onFormChange({ target: { name: 'location', value: loc.display_name } } as any)
+                onFormChange({ target: { name: 'latitude', value: loc.lat } } as any)
+                onFormChange({ target: { name: 'longitude', value: loc.lon } } as any)
+              }} />
+            </div>
+          </div>
 
-      {/* Professional Info */}
-      <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
-        <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <Briefcase className="h-6 w-6 text-purple-500" />
-          Professional Details
-        </h3>
-        <SelectField label="Education" name="education" value={formData.education ?? ""} onChange={onFormChange} options={educationOptions} />
-        <InputField label="Profession" name="profession" value={formData.profession ?? ""} onChange={onFormChange} />
-      </div>
+          {/* Professional Info */}
+          <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <Briefcase className="h-6 w-6 text-purple-500" /> Professional Details
+            </h3>
+            <SelectField label="Education" name="education" value={formData.education ?? ""} onChange={onFormChange} options={educationOptions} />
+            <InputField label="Profession" name="profession" value={formData.profession ?? ""} onChange={onFormChange} />
+          </div>
+        </>
+      )}
 
       {/* Partner Preferences */}
       <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
         <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-          <Heart className="h-6 w-6 text-red-500" />
-          Partner Preferences
+          <Heart className="h-6 w-6 text-red-500" /> Partner Preferences
         </h3>
         <div className="grid md:grid-cols-2 gap-6">
-          {renderRangeSelect("Age", "lookingFor.age_from", "lookingFor.age_to", ageGroupOptions, "lookingFor.age")}
+          {/* CRITICAL FIX: Changed parentName from 'lookingFor.age' to 'lookingFor.age_group' */}
+          {renderRangeSelect("Age", "lookingFor.age_from", "lookingFor.age_to", ageGroupOptions, "lookingFor.age_group")}
           {renderRangeSelect("Height", "lookingFor.height_from", "lookingFor.height_to", heightOptions, "lookingFor.height")}
+          
           <SelectField label="Gender" name="lookingFor.gender" value={formData.lookingFor?.gender ?? ""} onChange={onFormChange} options={genderOptions} />
           <SelectField label="Marital Status" name="lookingFor.marital_status" value={formData.lookingFor?.marital_status ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
           <SelectField label="Religion" name="lookingFor.religion" value={formData.lookingFor?.religion ?? ""} onChange={onFormChange} options={religionOptions} />
@@ -204,7 +241,6 @@ export default function EditProfile({
           <SelectField label="Family Values" name="lookingFor.family_values" value={formData.lookingFor?.family_values ?? ""} onChange={onFormChange} options={["Traditional","Moderate","Liberal"]} />
           <SelectField label="Living Preference" name="lookingFor.living_preference" value={formData.lookingFor?.living_preference ?? ""} onChange={onFormChange} options={["City","Village","Abroad"]} />
           <SelectField label="Open to Long Distance?" name="lookingFor.long_distance" value={formData.lookingFor?.long_distance ?? ""} onChange={onFormChange} options={["Yes","Usually don't prefer"]} />
-
           <div className="space-y-2 md:col-span-2">
             <label className="block text-sm font-semibold text-gray-700">Caste</label>
             {renderCastePills(getCasteArray(formData.lookingFor?.caste), 'lookingFor.caste')}
@@ -216,14 +252,14 @@ export default function EditProfile({
       <div className="flex justify-center gap-4">
         <button type="submit" disabled={uploadingPhoto} className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-8 py-3 rounded-full hover:from-pink-600 hover:to-purple-700 transition-all duration-200 flex items-center gap-2 text-lg font-semibold shadow-lg transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
           <Check className="h-5 w-5" />
-          {uploadingPhoto ? "Saving..." : "Save Changes"}
+          {uploadingPhoto ? "Saving..." : showOnlyLookingFor ? "Save Preferences" : "Save Changes"}
         </button>
       </div>
     </form>
   );
 }
 
-// --- Input, Select, TextArea Components ---
+// --- Reusable Inputs ---
 function InputField({ label, name, value, onChange, type = "text", placeholder }: any) { 
   return (
     <div className="space-y-2">
