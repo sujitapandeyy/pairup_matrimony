@@ -26,10 +26,16 @@ export default function ProfileView({ profile, onEditClick, showLookingFor = tru
               <DetailItem icon={<Mail className="h-4 w-4" />} label="Email" value={profile.email} />
               <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={profile.gender ?? "N/A"} />
               <DetailItem icon={<Baby className="h-4 w-4" />} label="Height" value={profile.height ?? "N/A"} />
+              <DetailItem icon={<Baby className="h-4 w-4" />} label="Age" value={profile.age ?? "N/A"} />
               <DetailItem icon={<Hand className="h-4 w-4" />} label="Personality " value={profile.personality ?? "N/A"} />
               <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={profile.maritalStatus ?? "N/A"} />
               <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={profile.religion ?? "N/A"} />
               <DetailItem icon={<Church className="h-4 w-4" />} label="Caste " value={profile.caste ?? "N/A"} />
+              <DetailItem
+                icon={<Home className="h-4 w-4" />}
+                label="Hobbies"
+                value={Array.isArray(profile.hobbies) ? profile.hobbies.join(", ") : profile.hobbies ?? "N/A"}
+              />
             </div>
           </div>
 

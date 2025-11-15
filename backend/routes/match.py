@@ -1,57 +1,59 @@
+# match_routes.py
 from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.match_service import MatchService
-from bson.errors import InvalidId
 from services.match_algorithm import MatchAlgorithm
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from bson.errors import InvalidId
 
 match_bp = Blueprint("match_bp", __name__)
 
+# ---------------- Profiles ----------------
 @match_bp.route("/get_profiles", methods=["GET"])
+@jwt_required()
 def get_profiles():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"error": "Missing email"}), 400
+    current_email = get_jwt_identity()
     service = MatchAlgorithm(current_app.mongo.db)
-    profiles = service.get_profiles(request, email)
+    profiles = service.get_profiles(request, current_email)
     return jsonify(profiles), 200
 
-@match_bp.route("/get_similar_profiles", methods=["GET"])
-def get_similar_profiles():
-    print("Request args:", request.args)
-    profile_email = request.args.get("profile_email")
-    if not profile_email:
-        print("Missing profile_email in request.args")
-        return jsonify({"error": "Missing profile_email"}), 400
+# @match_bp.route("/get_similar_profiles", methods=["GET"])
+# @jwt_required()
+# def get_similar_profiles():
+#     profile_email = request.args.get("profile_email")
+#     if not profile_email:
+#         return jsonify({"error": "Missing profile_email"}), 400
 
-    service = MatchAlgorithm(current_app.mongo.db)
-    result = service.get_similar_profiles_for_profile(request, profile_email)
-    return jsonify(result), 200
+#     service = MatchAlgorithm(current_app.mongo.db)
+#     result = service.get_similar_profiles_for_profile(request, profile_email)
+#     return jsonify(result), 200
 
+# ---------------- Swipe ----------------
 @match_bp.route("/swipe", methods=["POST"])
+@jwt_required()
 def swipe():
+    current_email = get_jwt_identity()
     data = request.get_json()
-    swiper = data.get("swiper_email")
     target = data.get("target_email")
     liked = data.get("liked")
 
-    if not swiper or not target or liked is None:
+    if not target or liked is None:
         return jsonify({"error": "Missing fields"}), 400
 
     service = MatchService(current_app.mongo.db)
-    result = service.swipe(swiper, target, liked)
+    result = service.swipe(current_email, target, liked)
     return jsonify(result), 200
 
+# ---------------- Notifications ----------------
 @match_bp.route("/notifications", methods=["GET"])
+@jwt_required()
 def get_notifications():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"error": "Missing email"}), 400
+    current_email = get_jwt_identity()
     service = MatchService(current_app.mongo.db)
-    notes = service.get_notifications(email, request)
+    notes = service.get_notifications(current_email, request)
     return jsonify(notes), 200
 
 @match_bp.route("/notifications/read", methods=["POST"])
+@jwt_required()
 def mark_read():
     data = request.get_json()
     note_id = data.get("notification_id")
@@ -68,6 +70,7 @@ def mark_read():
         return jsonify({"error": "Invalid ID"}), 400
 
 @match_bp.route("/ignore/<notification_id>", methods=["DELETE"])
+@jwt_required()
 def ignore(notification_id):
     try:
         service = MatchService(current_app.mongo.db)
@@ -78,69 +81,57 @@ def ignore(notification_id):
     except InvalidId:
         return jsonify({"error": "Invalid ID"}), 400
 
+# ---------------- Matches ----------------
 @match_bp.route("/get_mutual_matches", methods=["GET"])
+@jwt_required()
 def get_mutual_matches():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"error": "Missing email"}), 400
+    current_email = get_jwt_identity()
     service = MatchService(current_app.mongo.db)
-    matches = service.get_mutual_matches(email, request)
-    return jsonify({"logged_in_user": email, "matches": matches}), 200
+    matches = service.get_mutual_matches(current_email, request)
+    return jsonify({"logged_in_user": current_email, "matches": matches}), 200
 
+# ---------------- Sent Requests ----------------
 @match_bp.route('/sent_requests', methods=['GET'])
+@jwt_required()
 def sent_requests():
-    email = request.args.get('email')
-    if not email:
-        return jsonify({"error": "Missing email"}), 400
-
+    current_email = get_jwt_identity()
     service = MatchService(current_app.mongo.db)
-    sent = service.get_sent_requests(email, request)
+    sent = service.get_sent_requests(current_email, request)
     return jsonify({"sentRequests": sent}), 200
 
 @match_bp.route("/sent_requests/cancel", methods=["POST"])
+@jwt_required()
 def cancel_sent_request():
+    current_email = get_jwt_identity()
     data = request.get_json()
-    swiper = data.get("swiper_email")
     target = data.get("target_email")
 
-    if not swiper or not target:
+    if not target:
         return jsonify({"error": "Missing required fields"}), 400
 
     service = MatchService(current_app.mongo.db)
-    success = service.cancel_sent_request(swiper, target)
+    success = service.cancel_sent_request(current_email, target)
     if success:
         return jsonify({"message": "Request cancelled"}), 200
     else:
         return jsonify({"error": "Request not found"}), 404
-    
-@match_bp.route("/similar_to_liked", methods=["GET"])
-def similar_to_liked():
-        email = request.args.get("email")
-        if not email:
-            return jsonify({"error": "Missing email"}), 400
 
+
+@match_bp.route("/recommended_users", methods=["GET"])
+@jwt_required()
+def recommended_users():
+    try:
+        current_email = get_jwt_identity()
         service = MatchService(current_app.mongo.db)
-        results = service.get_similar_to_liked_users(email, request)
+        results = service.get_recommended_users(current_email, request)
         return jsonify(results), 200
-
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @match_bp.route("/people_near_you", methods=["GET"])
+@jwt_required()
 def people_near_you():
-    email = request.args.get("email")
-    if not email:
-        return jsonify({"error": "Missing email"}), 400
-
+    current_email = get_jwt_identity()
     service = MatchService(current_app.mongo.db)
-    results = service.get_people_near_you(email, request)
+    results = service.get_people_near_you(current_email, request)
     return jsonify(results), 200
-
-
-# def _calculate_trait_similarity(self, traits1, traits2):
-#     if not traits1 or not traits2:
-#         return 0
-#     text1 = " ".join(traits1)
-#     text2 = " ".join(traits2)
-#     vectorizer = CountVectorizer().fit_transform([text1, text2])
-#     vectors = vectorizer.toarray()
-#     cos_sim = cosine_similarity([vectors[0]], [vectors[1]])[0][0]
-#     return cos_sim

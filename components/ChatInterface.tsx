@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MessageCircle, Send, Heart } from 'lucide-react';
 import io from 'socket.io-client';
-import { toast } from 'sonner'
-import { SOCKET_SERVER } from '@/lib/api';
+import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-
+import api, { SOCKET_SERVER } from '@/lib/api';
+import { useTimeFormatter } from '@/hooks/useTimeFormatter';
 
 interface Match {
   _id?: string;
@@ -21,7 +22,6 @@ interface Match {
   lastRead?: string;
 }
 
-
 interface Message {
   sender: string;
   receiver: string;
@@ -35,137 +35,140 @@ interface ChatInterfaceProps {
   onUnreadCountChange: (count: number) => void;
 }
 
-// const SOCKET_SERVER = 'http://localhost:5050';
-
 const normalizeTimestamp = (ts?: string) => {
   if (!ts) return '';
   return ts.endsWith('Z') ? ts : ts + 'Z';
 };
 
+
 const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: ChatInterfaceProps) => {
+  const { data: session, status } = useSession();
   const [matches, setMatches] = useState<Match[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loggedInEmail, setLoggedInEmail] = useState('');
   const [newMessage, setNewMessage] = useState('');
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]); // Store all online users emails
-
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const { formatTime } = useTimeFormatter();
+  // const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const socketRef = useRef<any>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const selectedChatRef = useRef<Match | null>(null);
   const router = useRouter();
+  const loggedInEmail = session?.user?.email || '';
 
+  // Debug logging
+  // useEffect(() => {
+  //   console.log('Session status:', status);
+  //   console.log('Session data:', session);
+  //   console.log('Logged in email:', loggedInEmail);
+  // }, [session, status, loggedInEmail]);
 
   useEffect(() => {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
 
-  const formatTime = (timestamp?: string) => {
-    if (!timestamp) return '';
-    const isoTs = normalizeTimestamp(timestamp);
-    const date = new Date(isoTs);
-    if (isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kathmandu',
-    }).format(date);
-  };
-
-  const fetchReadReceipt = async (user: string, chatWith: string) => {
-    try {
-      const res = await fetch(`${SOCKET_SERVER}/chat/read_receipt?user=${user}&chat_with=${chatWith}`);
-      const data = await res.json();
-      return data?.last_read || null;
-    } catch {
-      return null;
-    }
-  };
-
   const fetchChatHistory = async (user1: string, user2: string): Promise<Message[]> => {
     try {
-      const res = await fetch(
-        `${SOCKET_SERVER}/chat/history?user1=${encodeURIComponent(user1)}&user2=${encodeURIComponent(user2)}`
-      );
-      const data = await res.json();
-      return (data.messages || []).map((msg: Message) => ({
+      const res = await api.get(`/chat/history`, {
+        params: { user1, user2 }
+      });
+      return (res.data.messages || []).map((msg: Message) => ({
         ...msg,
         timestamp: normalizeTimestamp(msg.timestamp),
       }));
     } catch (err) {
-      toast.error('Failed to load chat history:');
+      toast.error('Failed to load chat history');
       return [];
     }
   };
 
-  const fetchMatches = useCallback(async () => {
-    if (!loggedInEmail) return;
-    try {
-      const res = await fetch(`${SOCKET_SERVER}/matches/get_mutual_matches?email=${encodeURIComponent(loggedInEmail)}`);
-      const data = await res.json();
-      const rawMatches = data.matches || [];
 
-      const matchesWithMeta: Match[] = await Promise.all(
-        rawMatches.map(async (match: Match) => {
-          const history = await fetchChatHistory(loggedInEmail, match.email);
-          const last = history[history.length - 1];
-          const lastRead = await fetchReadReceipt(loggedInEmail, match.email);
-          return {
-            ...match,
-            lastMessage: last?.message,
-            lastTimestamp: last?.timestamp,
-            lastSender: last?.sender,
-            lastRead: lastRead ? normalizeTimestamp(lastRead) : undefined,
-            online: false,
-          };
-        })
-      );
+const fetchMatches = useCallback(async () => {
+  if (!loggedInEmail || !session) return;
+  
+  // Check if session is still valid
+  if (!session.accessToken) {
+    console.error('No access token available');
+    toast.error('Session expired. Please log in again.');
+    router.push('/login');
+    return;
+  }
+  
+  try {
+    const res = await api.get(`/matches/get_mutual_matches`, {
+      params: { email: loggedInEmail },
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`
+      }
+    });
 
-      matchesWithMeta.sort((a, b) => {
-        const aTime = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
-        const bTime = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
-        return bTime - aTime;
-      });
+    const rawMatches = res.data.matches || [];
 
-      setMatches(matchesWithMeta);
+    const matchesWithMeta: Match[] = await Promise.all(
+      rawMatches.map(async (match: Match) => {
+        const history = await fetchChatHistory(loggedInEmail, match.email);
+        const last = history[history.length - 1];
+        const lastRead = await fetchReadReceipt(loggedInEmail, match.email);
+        return {
+          ...match,
+          lastMessage: last?.message,
+          lastTimestamp: last?.timestamp,
+          lastSender: last?.sender,
+          lastRead: lastRead ? normalizeTimestamp(lastRead) : undefined,
+          online: false,
+        };
+      })
+    );
 
-      const unreadCount = matchesWithMeta.reduce((acc, m) => {
-        const unread =
-          m.lastMessage &&
-          m.lastSender !== loggedInEmail &&
-          (!m.lastRead || new Date(m.lastTimestamp || '').getTime() > new Date(m.lastRead).getTime());
-        return acc + (unread ? 1 : 0);
-      }, 0);
+    matchesWithMeta.sort((a, b) => {
+      const aTime = a.lastTimestamp ? new Date(a.lastTimestamp).getTime() : 0;
+      const bTime = b.lastTimestamp ? new Date(b.lastTimestamp).getTime() : 0;
+      return bTime - aTime;
+    });
 
-      onUnreadCountChange(unreadCount);
-    } catch (err) {
-      toast.error('Failed to load matches:');
-    }
-  }, [loggedInEmail, onUnreadCountChange]);
+    setMatches(matchesWithMeta);
 
+    const unreadCount = matchesWithMeta.reduce((acc, m) => {
+      const unread =
+        m.lastMessage &&
+        m.lastSender !== loggedInEmail &&
+        (!m.lastRead || new Date(m.lastTimestamp || '').getTime() > new Date(m.lastRead).getTime());
+      return acc + (unread ? 1 : 0);
+    }, 0);
+
+    onUnreadCountChange(unreadCount);
+  } catch (err) {
+    console.error('Failed to load matches:', err);
+    toast.error('Failed to load matches');
+  }
+}, [loggedInEmail, onUnreadCountChange, session]);
+
+
+  // Initialize socket connection with NextAuth token
   useEffect(() => {
-    const storedUser = localStorage.getItem('pairupUser');
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        if (user.email) setLoggedInEmail(user.email);
-      } catch {}
-    }
-  }, []);
+    if (!loggedInEmail || !session?.accessToken || status !== 'authenticated') return;
 
-  useEffect(() => {
-    if (!loggedInEmail) return;
+    const socket = io(SOCKET_SERVER, {
+      query: { email: loggedInEmail },
+      auth: { token: session.accessToken } 
+    });
 
-    const socket = io(SOCKET_SERVER, { query: { email: loggedInEmail } });
     socketRef.current = socket;
 
-    socket.on('online_users', (onlineEmails: string[]) => {
-      setOnlineUsers(onlineEmails); 
+    socket.on('connect', () => {
+      console.log('Socket connected successfully');
+    });
 
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      toast.error('Failed to connect to chat server');
+    });
+
+    socket.on('online_users', (onlineEmails: string[]) => {
+      setOnlineUsers(onlineEmails);
       setMatches((prev) =>
         prev.map((match) => ({
           ...match,
-          online: onlineEmails.includes(match.email), 
+          online: onlineEmails.includes(match.email),
         }))
       );
     });
@@ -201,16 +204,22 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
     });
 
     return () => {
+      socket.off('connect');
+      socket.off('connect_error');
       socket.off('online_users');
       socket.off('receive_message');
       socket.disconnect();
     };
-  }, [loggedInEmail]);
+  }, [loggedInEmail, session?.accessToken, status]);
 
+  // Fetch matches on mount
   useEffect(() => {
-    fetchMatches();
-  }, [fetchMatches]);
+    if (status === 'authenticated' && loggedInEmail) {
+      fetchMatches();
+    }
+  }, [fetchMatches, status, loggedInEmail]);
 
+  // Handle chat selection
   useEffect(() => {
     if (!socketRef.current || !loggedInEmail) return;
     if (selectedChat?.email) {
@@ -224,29 +233,35 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
     }
   }, [selectedChat, loggedInEmail]);
 
+  const fetchReadReceipt = async (user: string, chatWith: string) => {
+    try {
+      const res = await api.get(`/chat/read_receipt`, {
+        params: { user, chat_with: chatWith }
+      });
+      return res.data?.last_read || null;
+    } catch {
+      return null;
+    }
+  };
+  // Update read receipt
   useEffect(() => {
     if (selectedChat?.email && loggedInEmail && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg?.timestamp) {
-        fetch(`${SOCKET_SERVER}/chat/read_receipt`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user: loggedInEmail,
-            chat_with: selectedChat.email,
-            timestamp: lastMsg.timestamp,
-          }),
+        api.post('/chat/read_receipt', {
+          user: loggedInEmail,
+          chat_with: selectedChat.email,
+          timestamp: lastMsg.timestamp,
         }).then(() => {
-          fetchMatches(); 
+          fetchMatches();
+        }).catch(err => {
+          console.error('Failed to update read receipt:', err);
         });
       }
     }
   }, [selectedChat, messages, loggedInEmail, fetchMatches]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
+  
   const handleSendMessage = useCallback(() => {
     if (!newMessage.trim() || !selectedChat?.email || !socketRef.current) return;
     const messageData: Message = {
@@ -268,9 +283,37 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
     },
     [handleSendMessage]
   );
+  
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Show loading state
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not authenticated
+  // if (status === 'unauthenticated') {
+  //   return (
+  //     <div className="flex items-center justify-center h-screen">
+  //       <div className="text-center">
+  //         <p className="text-gray-500">Please log in to access chat</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="px-80 flex h-screen bg-white">
+    <div className="max-w-6xl mx-auto flex h-screen bg-gray-100 mr-20">  
+
       <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -298,7 +341,7 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
                   <div
                     key={match.email}
                     onClick={() => onSelectChat(match)}
-                    className={`flex items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    className={`flex items-center p-3 cursor-pointer hover:bg-gray-50 transition-colors rounded-xl mr-2 ${
                       selectedChat?.email === match.email ? 'bg-pink-50' : ''
                     }`}
                   >
@@ -309,17 +352,10 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
                           alt={match.name}
                           className="w-14 h-14 rounded-full object-cover border-2 border-gray-100"
                         />
-                      
-                         {onlineUsers.includes(match.email) && (
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                )}
-                      {/* <p className="text-sm text-gray-500">
-                {onlineUsers.includes(match.email) ? 'Online' : 'Offline'} • {match.location || ''}
-              </p> */}
-                      {/* {match.online && (
-                        <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
-                      )} */}
-                    </div>
+                        {onlineUsers.includes(match.email) && (
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 truncate">{match.name}</h3>
                         <p className={`text-sm truncate ${unread ? 'font-bold text-gray-900' : 'text-gray-500'}`}>
@@ -348,44 +384,43 @@ const ChatInterface = ({ onSelectChat, selectedChat, onUnreadCountChange }: Chat
         ) : (
           <>
             <div className="bg-white border-b border-gray-200 p-4 flex items-center gap-3">
-  <div
-    className="relative cursor-pointer group"
-    onClick={() => {
-      if (selectedChat?._id) {
-        sessionStorage.setItem("lastViewedProfile", selectedChat.email);
-        sessionStorage.setItem("returningFromProfile", "true");
-        router.push(`/user/${selectedChat._id}`);
-      } else {
-        toast.error("User ID not found");
-      }
-    }}
-  >
-    <img
-      src={selectedChat.images?.[0] || '/default-profile.jpg'}
-      alt={selectedChat.name}
-      className="w-12 h-12 rounded-full object-cover border border-gray-200 group-hover:opacity-90 transition"
-    />
-    {onlineUsers.includes(selectedChat.email) && (
-      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-    )}
-  </div>
+              <div
+                className="relative cursor-pointer group"
+                onClick={() => {
+                  if (selectedChat?._id) {
+                    sessionStorage.setItem("lastViewedProfile", selectedChat.email);
+                    sessionStorage.setItem("returningFromProfile", "true");
+                    router.push(`/user/${selectedChat._id}`);
+                  } else {
+                    toast.error("User ID not found");
+                  }
+                }}
+              >
+                <img
+                  src={selectedChat.images?.[0] || '/default-profile.jpg'}
+                  alt={selectedChat.name}
+                  className="w-12 h-12 rounded-full object-cover border border-gray-200 group-hover:opacity-90 transition"
+                />
+                {onlineUsers.includes(selectedChat.email) && (
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                )}
+              </div>
 
-  <div>
-    <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
-    <p className="text-sm text-gray-500">
-      {onlineUsers.includes(selectedChat.email) ? 'Online' : 'Offline'} • {selectedChat.location || ''}
-    </p>
-  </div>
-</div>
-
+              <div>
+                <h3 className="font-semibold text-gray-900 text-lg">{selectedChat.name}</h3>
+                <p className="text-sm text-gray-500">
+                  {onlineUsers.includes(selectedChat.email) ? 'Online' : 'Offline'} • {selectedChat.location || ''}
+                </p>
+              </div>
+            </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center text-gray-400 italic pt-20">No messages yet. Say hello! 👋</div>
               ) : (
-                messages.map((msg) => (
+                messages.map((msg, index) => (
                   <div
-                    key={`${msg.timestamp}_${msg.message}`}
+                    key={`${msg.timestamp}_${index}`}
                     className={`flex ${msg.sender === loggedInEmail ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className="flex items-start gap-3 max-w-xs">

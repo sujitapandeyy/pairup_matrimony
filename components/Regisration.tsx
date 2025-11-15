@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { Heart } from "lucide-react";
+import { useSession } from "next-auth/react";
+import api from "@/lib/api";
 
 const LocationInput = dynamic(() => import("@/components/LocationInput"), {
   ssr: false,
@@ -37,11 +38,13 @@ export default function Registration() {
   });
 
   const [loading, setLoading] = useState(false);
+  const { data: session, status } = useSession();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("pairupUser");
-    if (storedUser) router.push("/user_dashboard");
-  }, [router]);
+    if (status === "authenticated") {
+      router.push("/user_dashboard");
+    }
+  }, [status, router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -89,114 +92,95 @@ export default function Registration() {
     setStep(2);
   };
 
-  const handleFinalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const {
-      age,
-      gender,
-      religion,
-      location,
-      maritalStatus,
-      education,
-      profession,
-      personality,
-      hobbies,
-      caption,
-      latitude,
-      longitude,
-    } = detailsData;
+ const handleFinalSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  const {
+    age,
+    gender,
+    religion,
+    location,
+    maritalStatus,
+    education,
+    profession,
+    personality,
+    hobbies,
+    caption,
+    latitude,
+    longitude,
+  } = detailsData;
 
-    if (
-      !age ||
-      !gender ||
-      !religion ||
-      !location ||
-      !maritalStatus ||
-      !education ||
-      !profession ||
-      !personality ||
-      hobbies.length === 0
-    ) {
-      return toast.error("Fill all required fields");
-    }
+  if (
+    !age ||
+    !gender ||
+    !religion ||
+    !location ||
+    !maritalStatus ||
+    !education ||
+    !profession ||
+    !personality ||
+    hobbies.length === 0
+  ) {
+    return toast.error("Fill all required fields");
+  }
 
-    if (parseInt(age) < 18) {
-      return toast.error("Age must be 18+");
-    }
-    if (!latitude || !longitude) {
-      return toast.error(
-        "Invalid location details. Please provide valid location."
-      );
-    }
+  if (parseInt(age) < 18) {
+    return toast.error("Age must be 18+");
+  }
 
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:5050/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          details: detailsData,
-        }),
-      });
+  if (!latitude || !longitude) {
+    return toast.error(
+      "Invalid location details. Please provide valid location."
+    );
+  }
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast.success("Registration successful!");
-        localStorage.setItem(
-          "pairupUser",
-          JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-          })
-        );
-        router.push("/login");
-      } else {
-        toast.error(data.message || "Registration failed");
-      }
-    } catch {
-      toast.error("Server error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
 
-  const hobbiesList = [
-    "Traveling",
-    "Cooking",
-    "Art",
-    "Music",
-    "Fitness",
-    "Gaming",
-    "Movies",
-    "Adventure Sports",
-    "Dancing",
-    "Reading",
-    "Photography",
-    "Gardening",
-    "Volunteering",
-    "Technology",
-    "Writing",
-    "Pets",
-    "Fashion",
-    "Spirituality",
-    "Blogging",
-    "Languages",
-  ];
+  try {
+  const res = await api.post("/auth/register", {
+    ...formData,
+    details: detailsData,
+  });
+
+  const data = res.data;
+
+  if (data.success) {
+    toast.success("Registration successful!");
+    router.push("/login");
+    // auto-login code...
+  } else if (res.status === 409) {
+    toast.error("Email already registered. Try logging in.");
+  } else {
+    toast.error(data.message || "Registration failed");
+  }
+} catch (error: any) {
+  if (error.response?.status === 409) {
+    toast.error("Email already registered. Try logging in.");
+  } else {
+    console.error(error);
+    toast.error("Server error");
+  }
+} finally {
+  setLoading(false);
+}
+ };
+
+
+  const hobbiesList = ["Traveling","Cooking","Art","Music","Fitness","Gaming","Movies","Adventure Sports","Dancing","Reading","Photography","Gardening","Volunteering","Technology","Writing","Pets","Fashion","Spirituality","Blogging","Languages"];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12" 
-    // style={{ backgroundImage: `url("img/bg2.jpg")`,     backgroundRepeat: "no-repeat",backgroundSize: "cover",backgroundPosition: "center" }}
+    <div
+      className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12"
+      // style={{ backgroundImage: `url("img/bg2.jpg")`,     backgroundRepeat: "no-repeat",backgroundSize: "cover",backgroundPosition: "center" }}
     >
       <div className="bg-white shadow-xl rounded-xl max-w-md w-full p-8 ">
-       <div className="text-center mb-6">
-  <h1 className="text-3xl font-serif font-bold text-gray-800">
-    PairUp Matrimony
-  </h1>
-  {/* <div className="w-10 h-10 mx-auto m-2 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-serif font-bold text-gray-800">
+            PairUp Matrimony
+          </h1>
+          {/* <div className="w-10 h-10 mx-auto m-2 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
     <Heart className="w-6 h-6 text-white" />
   </div> */}
-</div>
+        </div>
 
         {step === 1 && (
           <>
@@ -303,9 +287,9 @@ export default function Registration() {
                 required
               >
                 <option value="">Select Personality</option>
-            <option value="Homebody">Homebody</option>
-            <option value="Social Butterfly">Social Butterfly</option>
-            <option value="Balanced">Balanced</option>
+                <option value="Homebody">Homebody</option>
+                <option value="Social Butterfly">Social Butterfly</option>
+                <option value="Balanced">Balanced</option>
               </select>
 
               <select
@@ -402,7 +386,7 @@ export default function Registration() {
                 <option value="Master's">Master's</option>
                 <option value="PhD">PhD</option>
               </select>
-        
+
               <input
                 type="text"
                 name="profession"

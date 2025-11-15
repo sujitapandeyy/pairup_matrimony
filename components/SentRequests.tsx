@@ -6,95 +6,58 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import api from '@/lib/api';
+import { getFullImageUrl } from '@/lib/utils/image';
+import { getTimeAgo } from '@/lib/utils/date';
+import { getCompatibilityColor } from '@/lib/utils/match';
+import type { Profile } from '@/types/allTypes';
 
-interface Profile {
-  id: string;
-  name: string;
-  email: string;
-  age: number;
-  location: string;
-  photos: string[];
-  profession?: string;
-  compatibility_score?: number;
-  created_at?: string;
-  status?: 'pending' | 'accepted' | 'rejected';
-}
-
-function getFullImageUrl(imagePath: string | null | undefined) {
-  if (!imagePath) return '/default-profile.jpg';
-  if (imagePath.startsWith('/uploads/')) {
-    return `${process.env.NEXT_PUBLIC_BACKEND_URL}${imagePath}`;
-  }
-  return imagePath;
-}
-
-function getTimeAgo(timestamp: string | Date | undefined) {
-  if (!timestamp) return 'recently';
-  const now = new Date();
-  const then = new Date(timestamp);
-  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  return `${weeks}w ago`;
-}
-
-const getCompatibilityColor = (score: number): string => {
-  if (score >= 90) return 'bg-emerald-600';
-  if (score >= 80) return 'bg-green-600';
-  if (score >= 70) return 'bg-lime-600';
-  if (score >= 60) return 'bg-yellow-500';
-  if (score >= 50) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
-  if (score >= 30) return 'bg-orange-600';
-  if (score >= 20) return 'bg-red-500';
-  return 'bg-red-700';
-};
 
 const SentRequests = () => {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [sentRequests, setSentRequests] = useState<Profile[] | null>(null);
   const [processingRequests, setProcessingRequests] = useState<Set<string>>(new Set());
-  const [userEmail, setUserEmail] = useState<string>('');
-
-  const fetchSentRequests = async () => {
-    try {
-      const userStr = localStorage.getItem('pairupUser');
-      if (!userStr) {
-        toast.error('Please log in');
-        router.push('/login');
-        return;
-      }
-      const user = JSON.parse(userStr);
-      setUserEmail(user.email);
-      
-      const res = await api.get(`matches/sent_requests?email=${encodeURIComponent(user.email)}`);
-
-      if (res.status === 200 && Array.isArray(res.data.sentRequests)) {
-        // Filter out accepted requests - they should only appear in the Requests page
-        const pendingRequests = res.data.sentRequests.filter(
-          (r: Profile) => r.status !== 'accepted'
-        );
-        setSentRequests(pendingRequests);
-      } else {
-        setSentRequests([]);
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to fetch sent requests');
-      setSentRequests([]);
-    }
-  };
 
   useEffect(() => {
+    if (status === 'loading') return;
+
+    if (!session?.user?.email) {
+      toast.error('Please log in to continue');
+      router.push('/login');
+      return;
+    }
+
+    const fetchSentRequests = async () => {
+      if (!session.accessToken) {
+          console.error('No access token available');
+          toast.error('Session expired. Please log in again.');
+          router.push('/login');
+          return;
+        }
+      try {
+        const res = await api.get(`/matches/sent_requests`, {
+          params: { email: session.user.email },
+        });
+
+        if (res.status === 200 && Array.isArray(res.data.sentRequests)) {
+          const pendingRequests = res.data.sentRequests.filter(
+            (r: Profile) => r.status !== 'accepted'
+          );
+          setSentRequests(pendingRequests);
+        } else {
+          setSentRequests([]);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to fetch sent requests');
+        setSentRequests([]);
+      }
+    };
+
     fetchSentRequests();
-  }, [router]);
+  }, [session, status, router]);
 
   const handleCancel = async (profile: Profile, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -102,21 +65,15 @@ const SentRequests = () => {
     setProcessingRequests((prev) => new Set(prev).add(profile.id));
 
     try {
-      const userStr = localStorage.getItem('pairupUser');
-      if (!userStr) return toast.error('User not logged in');
-      const user = JSON.parse(userStr);
-
-      const res = await api.post(`matches/sent_requests/cancel`, {
-        swiper_email: user.email,
+      const res = await api.post(`/matches/sent_requests/cancel`, {
+        swiper_email: session?.user?.email,
         target_email: profile.email,
       });
 
       if (res.status === 200) {
         toast.success('Request cancelled');
-        
-        // Auto-refresh after cancellation
         setTimeout(() => {
-          fetchSentRequests();
+          setSentRequests((prev) => prev?.filter((p) => p.id !== profile.id) || []);
         }, 300);
       } else {
         toast.error(res.data?.error || 'Cancel failed');
@@ -139,16 +96,22 @@ const SentRequests = () => {
     router.push(`/user/${profile.id}`);
   };
 
-  if (sentRequests === null) {
-    return <div className="text-center py-10">Loading sent requests...</div>;
-  }
+  if (status === 'loading' || sentRequests === null) {
+return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Sent Requests</h1>
 
       {sentRequests.length === 0 ? (
-        <div className=" py-10 text-gray-500">All the sent requests appears here!</div>
+        <div className="py-10 text-gray-500">All the sent requests appear here!</div>
       ) : (
         <div className="space-y-2">
           {sentRequests.map((profile) => {
@@ -216,7 +179,6 @@ const SentRequests = () => {
                       )}
                     </div>
 
-                    {/* Cancel Button */}
                     <div className="flex gap-2 mt-3">
                       <Button
                         onClick={(e) => handleCancel(profile, e)}
@@ -235,10 +197,9 @@ const SentRequests = () => {
                     </div>
                   </div>
 
-                  {/* Timestamp */}
                   <div className="flex-shrink-0 flex items-start gap-1 text-xs text-gray-400">
                     <Clock className="w-3 h-3 mt-0.5" />
-                    <span>{getTimeAgo(profile.created_at)}</span>
+                    <span>{getTimeAgo(profile.created_at ?? new Date())}</span>
                   </div>
                 </div>
               </div>

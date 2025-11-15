@@ -1,32 +1,26 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import ProfilePage from '@/components/ProfilePage';
 
 export default function Profile() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem('pairupUser');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed.email) {
-          setUserId(parsed.email);
-        }
-      } catch (err) {
-        console.error('Invalid user data in localStorage');
-      }
-    }
-  }, []);
-
-  if (!userId) {
+  if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500 text-lg">
-        Loading user profile...
+        Checking authentication...
       </div>
     );
   }
 
-  return <ProfilePage userId={userId} />;
+  if (status === 'unauthenticated' || !session?.user?.email) {
+    router.replace('/login');
+    return null;
+  }
+
+  return <ProfilePage userId={session.user.email} />;
 }

@@ -21,4 +21,21 @@ def get_read_receipt():
     chat_with = request.args.get('chat_with')
     return chat_service.get_read_receipt(user, chat_with)
 
-
+@chat_bp.route('/unread-count', methods=['GET'])
+def get_unread_count():
+    """Get count of unread messages for the current user"""
+    try:
+        current_user = get_jwt_identity()  # Get user email/id from JWT token
+        
+        # Get unread count from chat service
+        unread_count = chat_service.get_unread_count(current_user)
+        
+        return jsonify({
+            'success': True,
+            'count': unread_count
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500

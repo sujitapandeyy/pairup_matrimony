@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import "./globals.css";
 import { Toaster } from "sonner";
 import NavBar from "@/components/NavBar";
+import SessionProvider from "@/components/providers/SessionProvider";
+import { Providers } from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,15 +27,25 @@ export default function RootLayout({
   const pathname = usePathname();
 
   // Hide navbar on /login and /register
-  const hideNavBar = ["/login", "/register", '/interest', '/','/interests'].includes(pathname);
+  const hideNavBar = [
+    "/login",
+    "/register",
+    "/interest",
+    "/",
+    "/interests",
+  ].includes(pathname);
   // const hideNavBar = [""].includes(pathname);
 
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {!hideNavBar && <NavBar />}
-        {children}
-        <Toaster richColors position="bottom-right" duration={2000} />
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Providers>
+          {!hideNavBar && <NavBar />}
+          {children}
+          <Toaster richColors position="bottom-right" duration={2000} />
+        </Providers>
       </body>
     </html>
   );

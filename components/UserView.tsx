@@ -1,17 +1,20 @@
 'use client';
 
 import { useEffect, useState, ChangeEvent, FormEvent } from 'react';
-import { Heart, Briefcase, GraduationCap, Mail, Calendar, Users, Home, X, Church, Baby, ArrowLeft, MapPin, Ruler } from 'lucide-react';
+import {
+  Heart, Briefcase, GraduationCap, Mail, Calendar, Users,
+  Home, X, Church, Baby, ArrowLeft, MapPin, Ruler
+} from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Badge } from "@/components/ui/badge";
 
 interface UserViewProps {
   userId: string;
 }
 
-// Helper function for compatibility color
 const getCompatibilityColor = (score: number): string => {
   if (score >= 90) return "bg-emerald-600";
   if (score >= 80) return "bg-green-600";
@@ -27,6 +30,8 @@ const getCompatibilityColor = (score: number): string => {
 export default function UserView({ userId }: UserViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession(); // ✅ NextAuth session
+
   const from = searchParams.get('from');
   const scrollPosition = searchParams.get('scroll');
   const profileIndex = searchParams.get('index');
@@ -38,10 +43,8 @@ export default function UserView({ userId }: UserViewProps) {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [gallery, setGallery] = useState<string[]>([]);
-  const [uploadingPhoto] = useState(false);
   const [compatibilityScore, setCompatibilityScore] = useState<number | null>(null);
 
-  // --- Helper to build full URL for images ---
   function getFullImageUrl(photoPath?: string | null) {
     if (!photoPath) return '/default-profile.jpg';
     if (photoPath.startsWith('/uploads/')) {
@@ -52,6 +55,13 @@ export default function UserView({ userId }: UserViewProps) {
 
   // --- Fetch Profile + Compatibility ---
   useEffect(() => {
+    if (status === 'loading') return;
+    if (!session?.user?.email) {
+      toast.error("You must be logged in to view profiles");
+      router.push('/login');
+      return;
+    }
+
     async function fetchProfile() {
       try {
         const res = await api.get(`/api/user/profile/${userId}`);
@@ -59,31 +69,24 @@ export default function UserView({ userId }: UserViewProps) {
         setProfile(data);
 
         // Fetch compatibility score
-        const storedUser = localStorage.getItem("pairupUser");
-        if (storedUser) {
-          try {
-            const currentUser = JSON.parse(storedUser);
-            if (currentUser?.email && data.email !== currentUser.email) {
-              // Fetch all profiles to get compatibility score
-              const profilesRes = await api.get(
-                `/matches/get_profiles?email=${encodeURIComponent(currentUser.email)}`
-              );
-              const allProfiles = profilesRes.data.profiles;
-              const matchedProfile = allProfiles.find((p: any) => p.email === data.email);
-              if (matchedProfile?.compatibility_score !== undefined) {
-                setCompatibilityScore(matchedProfile.compatibility_score);
-              }
-            }
-          } catch (err) {
-            console.error("Error fetching compatibility score:", err);
+        const sessionEmail = session?.user?.email;
+        if (sessionEmail && data.email !== sessionEmail) {
+          const profilesRes = await api.get(
+            `/matches/get_profiles?email=${encodeURIComponent(sessionEmail)}`
+          );
+          const allProfiles = profilesRes.data.profiles;
+          const matchedProfile = allProfiles.find((p: any) => p.email === data.email);
+          if (matchedProfile?.compatibility_score !== undefined) {
+            setCompatibilityScore(matchedProfile.compatibility_score);
           }
         }
       } catch (error) {
         toast.error('Failed to fetch user profile');
       }
     }
+
     fetchProfile();
-  }, [userId]);
+  }, [userId, session, status]);
 
   // --- Fetch Gallery ---
   useEffect(() => {
@@ -109,6 +112,10 @@ export default function UserView({ userId }: UserViewProps) {
       router.back();
     }
   };
+
+  if (status === 'loading') {
+    return <div className="p-10 text-center text-gray-500">Checking session...</div>;
+  }
 
   if (!profile) {
     return <div className="p-10 text-center text-gray-500">Loading profile...</div>;
@@ -169,7 +176,7 @@ export default function UserView({ userId }: UserViewProps) {
     <>
       {/* Back Button */}
       <div className="max-w-4xl mx-auto pt-6 px-4">
-        <button 
+        <button
           onClick={handleBack}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
         >
@@ -181,8 +188,7 @@ export default function UserView({ userId }: UserViewProps) {
       {/* Main Card */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white overflow-hidden">
-          
-          {/* Profile Header Section */}
+          {/* Profile Header */}
           <div className="px-8 pt-8 pb-6">
             <div className="flex items-start gap-6">
               {/* Profile Picture */}
@@ -193,19 +199,13 @@ export default function UserView({ userId }: UserViewProps) {
                     alt={profile.name || 'Profile'}
                     className="w-full h-full object-cover"
                   />
-                  {uploadingPhoto && (
-                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Profile Info */}
+              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-1">
                   <h1 className="text-3xl font-bold text-gray-900">{profile.name || 'User Profile'}</h1>
-                  {/* Compatibility Badge */}
                   {compatibilityScore !== null && (
                     <Badge
                       className={`text-xs px-3 py-1.5 text-white font-semibold shadow-lg ${getCompatibilityColor(
@@ -216,8 +216,9 @@ export default function UserView({ userId }: UserViewProps) {
                     </Badge>
                   )}
                 </div>
-                <p className="text-gray-500 text-lg mb-3">@{profile.username || profile.name?.toLowerCase().replace(/\s+/g, '')}</p>
-                
+                <p className="text-gray-500 text-lg mb-3">
+                  @{profile.username || profile.name?.toLowerCase().replace(/\s+/g, '')}
+                </p>
                 {/* Quick Info */}
                 <div className="flex flex-wrap gap-4 text-gray-600 mb-4">
                   {profile.age && (
@@ -268,57 +269,37 @@ export default function UserView({ userId }: UserViewProps) {
           {/* Tabs */}
           <div className="border-b border-gray-200 px-8">
             <div className="flex gap-8">
-              <button
-                onClick={() => setActiveTab('photos')}
-                className={`pb-4 font-semibold transition-colors relative ${
-                  activeTab === 'photos'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Photos
-                {activeTab === 'photos' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`pb-4 font-semibold transition-colors relative ${
-                  activeTab === 'details'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Details
-                {activeTab === 'details' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('looking')}
-                className={`pb-4 font-semibold transition-colors relative ${
-                  activeTab === 'looking'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Looking For
-                {activeTab === 'looking' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
-                )}
-              </button>
+              {['photos', 'details', 'looking'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={`pb-4 font-semibold transition-colors relative ${
+                    activeTab === tab
+                      ? 'text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab === 'photos' ? 'Photos' : tab === 'details' ? 'Details' : 'Looking For'}
+                  {activeTab === tab && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-900 rounded-t-full"></div>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Tab Content */}
           <div className="p-8">
-            {/* Photos Tab */}
+            {/* Photos */}
             {activeTab === 'photos' && (
               <div>
                 {gallery.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {gallery.map((img, idx) => (
-                      <div key={idx} className="aspect-square rounded-lg overflow-hidden bg-gray-200 hover:opacity-90 transition cursor-pointer">
+                      <div
+                        key={idx}
+                        className="aspect-square rounded-lg overflow-hidden bg-gray-200 hover:opacity-90 transition cursor-pointer"
+                      >
                         <img src={img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
                       </div>
                     ))}
@@ -329,28 +310,26 @@ export default function UserView({ userId }: UserViewProps) {
               </div>
             )}
 
-            {/* Details Tab */}
+            {/* Details */}
             {activeTab === 'details' && (
               <div className="space-y-8">
-                {/* Personal Details */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Users className="h-5 w-5 text-pink-500" />
-                    Personal Details
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <DetailItem icon={<Mail className="h-4 w-4" />} label="Email" value={safe(profile.email)} />
-                    <DetailItem icon={<Calendar className="h-4 w-4" />} label="Age" value={safe(profile.age)} />
-                    <DetailItem icon={<Users className="h-4 w-4" />} label="Gender" value={safe(profile.gender)} />
-                    <DetailItem icon={<Ruler className="h-4 w-4" />} label="Height" value={safe(profile.height)} />
-                    <DetailItem icon={<Church className="h-4 w-4" />} label="Caste" value={safe(profile.caste)} />
-                    <DetailItem icon={<Baby className="h-4 w-4" />} label="Personality" value={safe(profile.personality)} />
-                    <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={safe(profile.religion)} />
-                    <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={safe(profile.marital_status)} />
-                  </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-pink-500" />
+                  Personal Details
+                </h3>
+                {/* Detail Items */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <DetailItem icon={<Mail />} label="Email" value={safe(profile.email)} />
+                  <DetailItem icon={<Calendar />} label="Age" value={safe(profile.age)} />
+                  <DetailItem icon={<Users />} label="Gender" value={safe(profile.gender)} />
+                  <DetailItem icon={<Ruler />} label="Height" value={safe(profile.height)} />
+                  <DetailItem icon={<Church className="h-4 w-4" />} label="Caste" value={safe(profile.caste)} />
+                  <DetailItem icon={<Baby className="h-4 w-4" />} label="Personality" value={safe(profile.personality)} />
+                  <DetailItem icon={<Home className="h-4 w-4" />} label="Religion" value={safe(profile.religion)} />
+                  <DetailItem icon={<Heart className="h-4 w-4" />} label="Marital Status" value={safe(profile.marital_status)} />
+                  
                 </div>
-
-                {/* Professional Details */}
+            {/* Professional Details */}
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                     <Briefcase className="h-5 w-5 text-blue-500" />
@@ -363,6 +342,8 @@ export default function UserView({ userId }: UserViewProps) {
                 </div>
               </div>
             )}
+              </div>
+            
 
             {/* Looking For Tab */}
             {activeTab === 'looking' && (
@@ -389,7 +370,8 @@ export default function UserView({ userId }: UserViewProps) {
             )}
           </div>
         </div>
-      </div>
+
+        
 
       {/* --- Report Modal --- */}
       {showReportModal && (

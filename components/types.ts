@@ -7,6 +7,7 @@ export interface Profile {
   height?: string;
   location?: string;
   fullLocation?: string;
+  hobbies?: string[];
   coordinates?: number[];
   maritalStatus?: string;
   caste?: string;

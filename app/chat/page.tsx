@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { SessionProvider } from 'next-auth/react';
 import ChatInterface from '@/components/ChatInterface';
-// import NavBar from '@/components/NavBar';
 
 interface Match {
+  _id?: string;
   name: string;
   email: string;
   images: string[];
@@ -21,13 +22,14 @@ export default function ChatPage() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   return (
-    <>
-      {/* <NavBar unreadMessageCount={unreadCount} /> */}
-      <ChatInterface
-        onSelectChat={setSelectedChat}
-        selectedChat={selectedChat}
-        onUnreadCountChange={setUnreadCount}
-      />
-    </>
+    <SessionProvider>
+      <div className="h-screen">
+        <ChatInterface
+          onSelectChat={setSelectedChat}
+          selectedChat={selectedChat}
+          onUnreadCountChange={setUnreadCount}
+        />
+      </div>
+    </SessionProvider>
   );
 }

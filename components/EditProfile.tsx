@@ -10,7 +10,6 @@ const LocationInput = dynamic(() => import('@/components/LocationInput'), { ssr:
 
 interface EditProfileProps {
   profile: Profile;
-  // NOTE: formData is expected to contain lookingFor.xyz fields
   formData: Partial<Profile>; 
   onCancel: () => void;
   onSubmit: (e: React.FormEvent) => void;
@@ -24,6 +23,7 @@ interface EditProfileProps {
 
 const genderOptions = ["Male", "Female", "Any"];
 const religionOptions = ["Hindu", "Muslim", "Christian", "Buddhist", "Sikh", "Jain", "Other"];
+const hobbiesOptions = ["Traveling","Cooking","Art","Music","Fitness","Gaming","Movies","Adventure Sports","Dancing","Reading","Photography","Gardening","Volunteering","Technology","Writing","Pets","Fashion","Spirituality","Blogging","Languages"];
 const personalityOptions = ["Homebody","Social Butterfly","Balanced"];
 const casteOptions = ["Brahmin", "Chhetri", "Thakuri", "Newar","Tamang","Magar","Rai","Limbu","Sherpa","Gurung","Tharu","Madhesi", "Muslim","Dalit","Other"];
 const heightOptions = ["5'0\"", "5'1\"", "5'2\"", "5'3\"", "5'4\"", "5'5\"", "5'6\"", "5'7\"", "5'8\"", "5'9\"", "5'10\"", "5'11\""];
@@ -32,21 +32,16 @@ const educationOptions = ["High School", "Diploma", "Bachelor's", "Master's", "P
 const familyTypeOptions = ["Joint", "Nuclear"];
 const ageGroupOptions = Array.from({ length: 50 - 18 + 1 }, (_, i) => String(18 + i));
 
-// Helper function to get nested value from formData
 const getNestedValue = (obj: Partial<Profile>, path: string): string | undefined => {
     const parts = path.split('.');
     let current = obj as any;
     for (const part of parts) {
-        // Handle array and null checks safely
         if (!current || typeof current !== 'object' || !(part in current)) {
             return undefined;
         }
         current = current[part];
     }
-    // Convert array (like caste) to string, otherwise return string of the value
-    if (Array.isArray(current)) {
-        return current.join(', ');
-    }
+    if (Array.isArray(current)) return current.join(', ');
     return (current !== null && current !== undefined) ? String(current) : undefined;
 };
 
@@ -66,36 +61,24 @@ export default function EditProfile({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handlePhotoClick = () => fileInputRef.current?.click();
 
-  // --- Range selector for Age & Height ---
   const renderRangeSelect = (label: string, fromName: string, toName: string, options: string[], parentName: string) => {
-    
-    // 1. Try to read individual 'from' and 'to' values (e.g., lookingFor.age_from)
     let fromValue = getNestedValue(formData, fromName) || "";
     let toValue = getNestedValue(formData, toName) || "";
-    
-    // 2. If individual values are missing, try parsing the combined field (e.g., lookingFor.age_group: "25-30")
+
     if (!fromValue && !toValue) {
       const parentValue = getNestedValue(formData, parentName);
       if (parentValue && typeof parentValue === 'string' && (parentValue.includes('-') || parentValue.includes('–'))) {
-        // Use a regex to split by either hyphen or en dash, or simply split by hyphen/en dash and clean.
         const parts = parentValue.split(/[-–]/).map(p => p.trim());
         if (parts.length === 2) {
-          // ENSURE PARSED VALUE IS IN THE OPTIONS LIST BEFORE SETTING
-          const partFrom = parts[0];
-          const partTo = parts[1];
-          
-          fromValue = options.includes(partFrom) ? partFrom : "";
-          toValue = options.includes(partTo) ? partTo : "";
+          fromValue = options.includes(parts[0]) ? parts[0] : "";
+          toValue = options.includes(parts[1]) ? parts[1] : "";
         }
       }
     }
 
     const handleChange = (from: string, to: string) => {
-      // 3. Update individual from/to fields
       onFormChange({ target: { name: fromName, value: from } } as any);
       onFormChange({ target: { name: toName, value: to } } as any);
-
-      // 4. Update the combined parent field
       const combinedValue = from && to ? `${from}-${to}` : from || to || "";
       onFormChange({ target: { name: parentName, value: combinedValue } } as any);
     }
@@ -163,8 +146,7 @@ export default function EditProfile({
           {/* Profile Photo */}
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-              <Camera className="h-6 w-6 text-blue-500" />
-              Profile Photo
+              <Camera className="h-6 w-6 text-blue-500" /> Profile Photo
             </h3>
             <div className="flex flex-col items-center">
               <div className="relative mb-4">
@@ -193,11 +175,29 @@ export default function EditProfile({
             <SelectField label="Height" name="height" value={formData.height ?? ""} onChange={onFormChange} options={heightOptions} />
             <SelectField label="Gender" name="gender" value={formData.gender ?? ""} onChange={onFormChange} options={genderOptions} />
             <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
-            <div className="space-y-2">
+            <SelectField label="Religion" name="religion" value={formData.religion ?? ""} onChange={onFormChange} options={religionOptions} />
+            <SelectField label="Caste" name="caste" value={formData.caste ?? ""} onChange={onFormChange} options={casteOptions} />
+            <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
+
+            <MultiSelectPills
+              label="Hobbies"
+              options={hobbiesOptions}
+              selectedValues={getCasteArray(formData.hobbies)}
+              onChange={vals => onFormChange({ target: { name: 'hobbies', value: vals.join(', ') } } as any)}
+            />
+
+            {/* <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">Caste</label>
               {renderCastePills(getCasteArray(formData.caste), 'caste')}
             </div>
-            <SelectField label="Marital Status" name="maritalStatus" value={formData.maritalStatus ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
+
+            <MultiSelectPills
+              label="Marital Status"
+              options={maritalStatusOptions}
+              selectedValues={getCasteArray(formData.maritalStatus)}
+              onChange={vals => onFormChange({ target: { name: 'maritalStatus', value: vals.join(', ') } } as any)}
+            /> */}
+
             <TextAreaField label="About Me" name="caption" value={formData.caption ?? ""} onChange={onFormChange} placeholder="Tell us about yourself..." />
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">Location</label>
@@ -226,13 +226,10 @@ export default function EditProfile({
           <Heart className="h-6 w-6 text-red-500" /> Partner Preferences
         </h3>
         <div className="grid md:grid-cols-2 gap-6">
-          {/* CRITICAL FIX: Changed parentName from 'lookingFor.age' to 'lookingFor.age_group' */}
           {renderRangeSelect("Age", "lookingFor.age_from", "lookingFor.age_to", ageGroupOptions, "lookingFor.age_group")}
-          {renderRangeSelect("Height", "lookingFor.height_from", "lookingFor.height_to", heightOptions, "lookingFor.height")}
-          
+          {renderRangeSelect("Height",  "lookingFor.height_from", "lookingFor.height_to", heightOptions, "lookingFor.height")}
+
           <SelectField label="Gender" name="lookingFor.gender" value={formData.lookingFor?.gender ?? ""} onChange={onFormChange} options={genderOptions} />
-          <SelectField label="Marital Status" name="lookingFor.marital_status" value={formData.lookingFor?.marital_status ?? ""} onChange={onFormChange} options={maritalStatusOptions} />
-          <SelectField label="Religion" name="lookingFor.religion" value={formData.lookingFor?.religion ?? ""} onChange={onFormChange} options={religionOptions} />
           <SelectField label="Personality" name="lookingFor.personality" value={formData.lookingFor?.personality ?? ""} onChange={onFormChange} options={personalityOptions} />
           <SelectField label="Pet Preference" name="lookingFor.pet_preference" value={formData.lookingFor?.pet_preference ?? ""} onChange={onFormChange} options={["Love Them","Usually don't prefer"]} />
           <SelectField label="Education Level" name="lookingFor.education_level" value={formData.lookingFor?.education_level ?? ""} onChange={onFormChange} options={educationOptions} />
@@ -242,9 +239,29 @@ export default function EditProfile({
           <SelectField label="Living Preference" name="lookingFor.living_preference" value={formData.lookingFor?.living_preference ?? ""} onChange={onFormChange} options={["City","Village","Abroad"]} />
           <SelectField label="Open to Long Distance?" name="lookingFor.long_distance" value={formData.lookingFor?.long_distance ?? ""} onChange={onFormChange} options={["Yes","Usually don't prefer"]} />
           <div className="space-y-2 md:col-span-2">
-            <label className="block text-sm font-semibold text-gray-700">Caste</label>
-            {renderCastePills(getCasteArray(formData.lookingFor?.caste), 'lookingFor.caste')}
+          <MultiSelectPills
+            label="Caste"
+            options={casteOptions}
+            selectedValues={getCasteArray(formData.lookingFor?.caste)}
+            onChange={vals => onFormChange({ target: { name: 'lookingFor.caste', value: vals.join(', ') } } as any)}
+            />
+            </div>
+          <div className="space-y-2 md:col-span-2">
+          <MultiSelectPills
+            label="Religion"
+            options={religionOptions}
+            selectedValues={getCasteArray(formData.lookingFor?.religion)}
+            onChange={vals => onFormChange({ target: { name: 'lookingFor.religion', value: vals.join(', ') } } as any)}
+          />
           </div>
+          <div className="space-y-2 md:col-span-2">
+          <MultiSelectPills
+            label="Marital Status"
+            options={maritalStatusOptions}
+            selectedValues={getCasteArray(formData.lookingFor?.marital_status)}
+            onChange={vals => onFormChange({ target: { name: 'lookingFor.marital_status', value: vals.join(', ') } } as any)}
+            />
+            </div>
         </div>
       </div>
 
@@ -270,10 +287,12 @@ function InputField({ label, name, value, onChange, type = "text", placeholder }
 }
 
 function SelectField({ label, name, value, onChange, options }: any) { 
+  const safeValue = Array.isArray(value) || typeof value === 'object' ? '' : (value ?? '');
+  
   return (
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-gray-700">{label}</label>
-      <select name={name} value={value} onChange={onChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-gray-50 focus:bg-white">
+      <select name={name} value={safeValue} onChange={onChange} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-gray-50 focus:bg-white">
         <option value="">Select {label}</option>
         {options.map((opt:string)=><option key={opt} value={opt}>{opt}</option>)}
       </select>
@@ -286,6 +305,52 @@ function TextAreaField({ label, name, value, onChange, placeholder }: any) {
     <div className="space-y-2">
       <label className="block text-sm font-semibold text-gray-700">{label}</label>
       <textarea name={name} value={value} onChange={onChange} rows={4} placeholder={placeholder} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-gray-50 focus:bg-white resize-none"/>
+    </div>
+  );
+}
+
+function MultiSelectPills({
+  label,
+  options,
+  selectedValues,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  selectedValues: string[];
+  onChange: (newValues: string[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700">{label}</label>
+      <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto border border-gray-200 rounded-xl p-3 bg-gray-50">
+        {options.map(option => {
+          const isChecked = selectedValues.includes(option);
+          return (
+            <label
+              key={option}
+              className={`cursor-pointer rounded-lg px-4 py-2 border transition ${
+                isChecked
+                  ? "bg-green-700 text-white border-green-700"
+                  : "border-gray-300 text-gray-700 hover:bg-green-100"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="hidden"
+                checked={isChecked}
+                onChange={() => {
+                  let newValues = [...selectedValues];
+                  if (isChecked) newValues = newValues.filter(v => v !== option);
+                  else newValues.push(option);
+                  onChange(newValues);
+                }}
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 }

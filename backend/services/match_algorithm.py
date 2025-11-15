@@ -9,59 +9,114 @@ class MatchAlgorithm:
         self.interests = db["user_interests"]
         self.swipes = db["swipes"]
 
-    # --- Core similarity functions ---
     def _cosine_similarity(self, vec1, vec2):
+        """Calculate cosine similarity between two vectors"""
+        if not vec1 or not vec2 or len(vec1) != len(vec2):
+            return 0.0
+        
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         magnitude1 = sqrt(sum(a ** 2 for a in vec1))
         magnitude2 = sqrt(sum(b ** 2 for b in vec2))
+        
         if magnitude1 == 0 or magnitude2 == 0:
-            return 0
+            return 0.0
+        
         return dot_product / (magnitude1 * magnitude2)
 
-    def _text_to_vector(self, text):
-        words = text.lower().split()
-        word_counts = {}
-        for word in words:
-            word_counts[word] = word_counts.get(word, 0) + 1
-        return word_counts
+    def _encode_categorical(self, value, categories):
+        return [1.0 if cat.lower() == str(value).lower().strip() else 0.0 for cat in categories]
 
-    def _vectorize_features(self, user_data, candidate_data, distance_km=None):
-        features_list = [
-            "religion", "education", "profession", "hobbies", "personality",
-            "height", "marital_status", "pet_preference", "family_type",
-            "family_values", "living_preference", "age", "open_to_long_distance"
-        ]
-        user_features = {
-            k: " ".join(user_data.get(k, [])) if isinstance(user_data.get(k), list)
-            else str(user_data.get(k, "")) for k in features_list
-        }
-        candidate_features = {
-            k: " ".join(candidate_data.get(k, [])) if isinstance(candidate_data.get(k), list)
-            else str(candidate_data.get(k, "")) for k in features_list
-        }
+    def _encode_list(self, value, all_options):
+        value_set = self._to_set(value)
+        return [1.0 if opt in value_set else 0.0 for opt in all_options]
 
-        # Location soft scoring
+    def _normalize_value(self, value, min_val, max_val):
+        if max_val == min_val:
+            return 0.5
+        return (value - min_val) / (max_val - min_val)
+
+    def _vectorize_profile(self, user_detail, user_prefs, distance_km=None):
+ 
+        vector = []
+        
+        religions = ["hindu", "muslim", "christian", "sikh", "buddhist", "jain"]
+        religion_val = str(user_detail.get("religion", "")).lower().strip()
+        vector.extend(self._encode_categorical(religion_val, religions))
+        
+        education_levels = ["high school", "diploma", "bachelor's", "master's", "phd"]
+        education_val = str(user_detail.get("education", "")).lower().strip()
+        vector.extend(self._encode_categorical(education_val, education_levels))
+        
+        marital_statuses = ["single", "divorced", "widowed"]
+        marital_val = str(user_detail.get("marital_status", "")).lower().strip()
+        vector.extend(self._encode_categorical(marital_val, marital_statuses))
+        
+        genders = ["male", "female", "any"]
+        gender_val = str(user_detail.get("gender", "")).lower().strip()
+        vector.extend(self._encode_categorical(gender_val, genders))
+        
+        castes = ["brahmin", "chhetri", "thakuri", "newar", "tamang", "magar", "rai", 
+                  "limbu", "sherpa", "gurung", "dalit", "tharu", "madhesi", "muslim"]
+        caste_val = str(user_detail.get("caste", "")).lower().strip()
+        vector.extend(self._encode_categorical(caste_val, castes))
+        
+        age = user_detail.get("age", 25)
+        try:
+            age = int(float(str(age).strip()))
+        except:
+            age = 25
+        vector.append(self._normalize_value(age, 18, 60))
+        
+        height_val = user_detail.get("height") or user_prefs.get("height", "5'5\"")
+        try:
+            height_inches = self._height_to_inches(height_val)
+            vector.append(self._normalize_value(height_inches, 48, 84))  
+        except:
+            vector.append(0.5)
+        
+        personality_options = ["homebody", "social butterfly", "balanced"]
+        personality_val = str(user_prefs.get("personality", "")).lower().strip()
+        vector.extend(self._encode_categorical(personality_val, personality_options))
+        
+        hobby_options = ["reading", "sports", "travel", "cooking", "music", 
+                        "movies", "gaming", "art", "fitness", "photography"]
+        hobbies_val = user_detail.get("hobbies", [])
+        vector.extend(self._encode_list(hobbies_val, hobby_options))
+        
+        pet_prefs = ["love them", "usually don't prefer"]
+        pet_val = str(user_prefs.get("pet_preference", "")).lower().strip()
+        vector.extend(self._encode_categorical(pet_val, pet_prefs))
+        
+        family_types = ["joint", "nuclear"]
+        family_val = str(user_prefs.get("family_type", "")).lower().strip()
+        vector.extend(self._encode_categorical(family_val, family_types))
+        
+        family_values = ["traditional", "moderate", "liberal"]
+        values_val = str(user_prefs.get("family_values", "")).lower().strip()
+        vector.extend(self._encode_categorical(values_val, family_values))
+        
+        living_prefs = ["city", "village", "abroad"]
+        living_val = str(user_prefs.get("living_preference", "")).lower().strip()
+        vector.extend(self._encode_categorical(living_val, living_prefs))
+        
         if distance_km is not None:
             if distance_km <= 20:
-                loc_score = 10
+                distance_score = 1.0
             elif distance_km <= 100:
-                extra_km = distance_km - 20
-                blocks = (extra_km + 19) // 20
-                loc_score = 10 / (2 ** blocks)
+                distance_score = 1.0 - ((distance_km - 20) / 80)
             else:
-                loc_score = 0
-            user_features["location_score"] = f"loc_{round(loc_score, 2)}"
-            candidate_features["location_score"] = f"loc_{round(loc_score, 2)}"
-
-        user_text = " ".join(user_features.values())
-        candidate_text = " ".join(candidate_features.values())
-        user_vec = self._text_to_vector(user_text)
-        candidate_vec = self._text_to_vector(candidate_text)
-        all_words = set(user_vec.keys()).union(set(candidate_vec.keys()))
-        vec1 = [user_vec.get(word, 0) for word in all_words]
-        vec2 = [candidate_vec.get(word, 0) for word in all_words]
-
-        return vec1, vec2, user_features, candidate_features
+                distance_score = 0.0
+            vector.append(distance_score)
+        else:
+            vector.append(0.5)
+        
+        long_dist = str(user_prefs.get("long_distance", "no")).lower()
+        vector.append(1.0 if long_dist == "yes" else 0.0)
+        
+        profession = str(user_prefs.get("profession", "")).lower().strip()
+        vector.append(1.0 if profession else 0.0)
+        
+        return vector
 
     # --- Utility functions ---
     def _parse_preferences(self, preference_value):
@@ -75,19 +130,55 @@ class MatchAlgorithm:
             return {preference_value.strip().lower()}
         return set()
 
-    def _apply_rule_based_filtering(self, user_prefs, candidate_data):
+    def _apply_rule_based_filtering(self, user_prefs, candidate_data, candidate_prefs):
+      
         preferred_genders = self._parse_preferences(user_prefs.get("gender", "any"))
         candidate_gender = str(candidate_data.get("gender", "")).lower()
+        
         if "any" not in preferred_genders and candidate_gender not in preferred_genders:
-            return False, "Gender preference mismatch"
+            return False, f"User prefers {preferred_genders}, candidate is {candidate_gender}", "user"
+        
+        candidate_preferred_genders = self._parse_preferences(candidate_prefs.get("gender", "any"))
+        user_gender = str(candidate_data.get("gender", "")).lower()  
+        if "any" not in candidate_preferred_genders:
+            pass 
 
-        user_caste_prefs = self._parse_preferences(user_prefs.get("caste", "any"))
+        user_caste_prefs = self._parse_preferences(user_prefs.get("caste", []))
         candidate_caste = str(candidate_data.get("caste", "")).lower()
-        if "any" not in user_caste_prefs and candidate_caste:
+        
+        all_castes = {"brahmin", "chhetri", "thakuri", "newar", "tamang", "magar", "rai", 
+                      "limbu", "sherpa", "gurung", "dalit", "tharu", "madhesi", "muslim"}
+        
+        user_selected_all_castes = len(user_caste_prefs) >= len(all_castes)
+        
+        if not user_selected_all_castes and "any" not in user_caste_prefs and candidate_caste:
             if candidate_caste not in user_caste_prefs:
-                return False, f"Caste not in preferred: {user_caste_prefs}"
+                return False, f"User prefers {user_caste_prefs}, candidate is {candidate_caste}", "user"
+        
+        candidate_caste_prefs = self._parse_preferences(candidate_prefs.get("caste", []))
+        candidate_selected_all_castes = len(candidate_caste_prefs) >= len(all_castes)
+        
+        pref_age_val = user_prefs.get("age_group") or user_prefs.get("age") or user_prefs.get("preferred_age")
+        cand_age_raw = candidate_data.get("age")
+        
+        if pref_age_val and cand_age_raw:
+            try:
+                cand_age = int(float(str(cand_age_raw).strip()))
+                clean_str = str(pref_age_val).replace(" ", "")
+                
+                if "-" in clean_str:
+                    min_age, max_age = map(int, clean_str.split("-"))
+                else:
+                    min_age = max_age = int(clean_str)
+                
+                if not (min_age <= cand_age <= max_age):
+                    return False, f"User prefers age {min_age}-{max_age}, candidate is {cand_age}", "user"
+            except Exception:
+                pass
+        
+        candidate_pref_age = candidate_prefs.get("age_group") or candidate_prefs.get("age") or candidate_prefs.get("preferred_age")
 
-        return True, "Passed all filters"
+        return True, "Passed all filters", None
 
     def _profession_match(self, user_prof, candidate_prof):
         if not user_prof or not candidate_prof:
@@ -122,56 +213,50 @@ class MatchAlgorithm:
                 return {s.strip().lower() for s in val.split(",") if s.strip()}
             return {s.strip().lower() for s in val.split() if s.strip()}
         return set()
+    
+    def _to_list(self, val):
+        if not val:
+            return []
+        if isinstance(val, list):
+            return [str(v).strip() for v in val if v]
+        if isinstance(val, str):
+            if "," in val:
+                return [s.strip() for s in val.split(",") if s.strip()]
+            # Single value or space-separated
+            return [s.strip() for s in val.split() if s.strip()] if " " in val else [val.strip()]
+        return [str(val)]
 
     def _height_to_inches(self, h):
         s = str(h).replace(" ", "")
         if "'" in s:
-            ft, inch = s.split("'")
-            inch = inch.replace('"', '') or "0"
+            parts = s.split("'")
+            ft = parts[0]
+            inch = parts[1].replace('"', '').strip() if len(parts) > 1 else "0"
+            inch = inch if inch else "0"
             return int(ft) * 12 + int(inch)
         if "cm" in s:
             return int(round(int(s.replace("cm", "")) / 2.54))
         return int(float(s))
 
-    # --- Compatibility calculation ---
-    def _calculate_compatibility(self, user_detail, user_interests, candidate_detail, candidate_prefs, distance_km):
-        score_breakdown = {
-            "total_score": 0,
-            "feature_scores": {},
-            "feature_match_list": {"matched": [], "unmatched": []},
-            "content_similarity": {"score": 0, "status": ""},
-            "location": {"score": 0, "distance_km": distance_km, "status": ""},
-            "filter_passed": True,
-            "rejection_reason": None,
-            "compatibility_summary": ""
-        }
+    def _calculate_detailed_breakdown(self, user_detail, user_interests, candidate_detail, candidate_prefs):
 
         user_prefs = user_interests.get("looking_for", {})
-        passed, reason = self._apply_rule_based_filtering(user_prefs, candidate_detail)
-        if not passed:
-            score_breakdown["filter_passed"] = False
-            score_breakdown["rejection_reason"] = reason
-            score_breakdown["compatibility_summary"] = f"Incompatible: {reason}"
-            return score_breakdown
-
-        vec1, vec2, features, candidate_features = self._vectorize_features(user_detail, candidate_detail, distance_km)
-        content_score = self._cosine_similarity(vec1, vec2) * 100
-        score_breakdown["content_similarity"]["score"] = round(content_score, 2)
-        score_breakdown["content_similarity"]["status"] = "High" if content_score > 50 else "Low"
-
         feature_scores = {}
         matched_features = []
         unmatched_features = []
 
         features_list = ["religion", "education", "profession", "hobbies", "personality",
                          "height", "marital_status", "pet_preference", "family_type",
-                         "family_values", "living_preference", "age", "open_to_long_distance"]
+                         "family_values", "living_preference", "age"]
 
         for key in features_list:
-            u_val = user_detail.get(key) or user_prefs.get(key)
-            c_val = candidate_detail.get(key) or candidate_prefs.get(key)
+            if key == "profession":
+                u_val = user_prefs.get("profession")
+                c_val = candidate_detail.get("profession")
+            else:
+                u_val = user_detail.get(key) or user_prefs.get(key)
+                c_val = candidate_detail.get(key) or candidate_prefs.get(key)
 
-            # --- Age remains same ---
             if key == "age":
                 looking_for = user_interests.get("looking_for", {})
                 pref_age_val = looking_for.get("age_group") or looking_for.get("age") or looking_for.get("preferred_age")
@@ -181,7 +266,6 @@ class MatchAlgorithm:
                     continue
                 try:
                     cand_age = int(float(str(cand_age_raw).strip()))
-                    min_age = max_age = None
                     clean_str = str(pref_age_val).replace(" ", "")
                     if "-" in clean_str:
                         min_age, max_age = map(int, clean_str.split("-"))
@@ -197,16 +281,12 @@ class MatchAlgorithm:
                     feature_scores[key] = 0.0
                 continue
 
-            # --- ✅ Height range fix ---
-            # --- ✅ Height range fix ---
             if key == "height":
                 try:
-                    # Use the user's "looking_for" preference as user_value
                     pref_height = user_interests.get("looking_for", {}).get("height") or str(u_val)
                     cand_height = str(c_val).strip()
                     in_range = False
 
-                    # If the user provided a range like "5'3\" - 5'5\""
                     if pref_height and "-" in pref_height:
                         parts = pref_height.split("-")
                         min_h = self._height_to_inches(parts[0])
@@ -214,7 +294,6 @@ class MatchAlgorithm:
                         cand_h = self._height_to_inches(cand_height)
                         in_range = min_h <= cand_h <= max_h
                     elif pref_height:
-                        # Single value
                         in_range = self._height_to_inches(pref_height) == self._height_to_inches(cand_height)
 
                     feature_scores[key] = 1.0 if in_range else 0.0
@@ -227,7 +306,6 @@ class MatchAlgorithm:
                     feature_scores[key] = 0.0
                 continue
 
-            # --- ✅ Profession partial match remains ---
             if key == "profession":
                 if u_val and c_val:
                     is_match = self._profession_match(u_val, c_val)
@@ -241,42 +319,7 @@ class MatchAlgorithm:
                     feature_scores[key] = 0.0
                 continue
 
-            # --- ✅ Open to long distance fix ---
-            if key == "open_to_long_distance":
-                u_pref = user_prefs.get("long_distance") or u_val
-                c_pref = candidate_prefs.get("long_distance") or c_val
-                distance_val = distance_km or 0
-
-                # Logic based on user preference
-                score = 0.0
-                status = "Not open to long distance"
-
-                if str(u_pref).lower() == "yes" and str(c_pref).lower() == "yes":
-                    score = 1.0
-                    status = "Both open to long distance"
-                elif str(u_pref).lower() in ["usually don't prefer", "usually dont prefer"]:
-                    if distance_val <= 50:
-                        score = 1.0
-                        status = "Distance <50 km, accepted despite usually don't prefer"
-                    else:
-                        score = 0.0
-                        status = "Distance >50 km, usually don't prefer"
-                else:
-                    score = 0.0
-                    status = "Not open to long distance"
-
-                feature_scores[key] = score
-                (matched_features if score > 0 else unmatched_features).append({
-                    "feature": key,
-                    "user_value": u_pref,
-                    "candidate_value": c_pref
-                })
-                score_breakdown["location"]["score"] = score
-                score_breakdown["location"]["status"] = status
-                continue
-
-
-            # --- Default exact or list match ---
+            # Default exact or list match
             if isinstance(u_val, list) or isinstance(c_val, list):
                 u_set = self._to_set(u_val)
                 c_set = self._to_set(c_val)
@@ -297,14 +340,97 @@ class MatchAlgorithm:
                     feature_scores[key] = 0.0
                     unmatched_features.append({"feature": key, "user_value": u_val, "candidate_value": c_val})
 
-        total_percent = (sum(feature_scores.values()) / len(features_list)) * 100 if features_list else 0
-        total_percent = min(100, round(total_percent))
+        return feature_scores, matched_features, unmatched_features
 
+    # --- Compatibility calculation ---
+    def _calculate_compatibility(self, user_detail, user_interests, candidate_detail, candidate_prefs, distance_km):
+        score_breakdown = {
+            "total_score": 0,
+            "cosine_similarity_score": 0,
+            "feature_scores": {},
+            "feature_match_list": {"matched": [], "unmatched": []},
+            "location": {"score": 0, "distance_km": distance_km, "status": ""},
+            "filter_passed": True,
+            "rejection_reason": None,
+            "incompatible_side": None,
+            "compatibility_summary": ""
+        }
+
+        # Apply rule-based filtering first
+        user_prefs = user_interests.get("looking_for", {})
+        passed, reason, incompatible_side = self._apply_rule_based_filtering(user_prefs, candidate_detail, candidate_prefs)
+        
+        if not passed:
+            score_breakdown["filter_passed"] = False
+            score_breakdown["rejection_reason"] = reason
+            score_breakdown["incompatible_side"] = incompatible_side
+            score_breakdown["total_score"] = "Not Compatible"  # Show as text instead of 0
+            score_breakdown["cosine_similarity_score"] = 0
+            
+            # Still calculate detailed breakdown even if filtered out
+            feature_scores, matched, unmatched = self._calculate_detailed_breakdown(
+                user_detail, user_interests, candidate_detail, candidate_prefs
+            )
+            score_breakdown["feature_scores"] = {k: round(v, 3) for k, v in feature_scores.items()}
+            score_breakdown["feature_match_list"] = {"matched": matched, "unmatched": unmatched}
+            
+            # Add location info even for incompatible profiles
+            if distance_km is not None:
+                if distance_km <= 20:
+                    loc_status = "Very close"
+                elif distance_km <= 50:
+                    loc_status = "Nearby"
+                elif distance_km <= 100:
+                    loc_status = "Moderate distance"
+                else:
+                    loc_status = "Long distance"
+                score_breakdown["location"]["status"] = loc_status
+                score_breakdown["location"]["distance_km"] = round(distance_km, 2)
+            
+            side_text = f"Incompatible from {incompatible_side}'s side" if incompatible_side else "Incompatible"
+            score_breakdown["compatibility_summary"] = f"{side_text}: {reason}"
+            return score_breakdown
+
+        # Calculate PURE content-based similarity using cosine similarity
+        user_vector = self._vectorize_profile(user_detail, user_prefs, 0)
+        candidate_vector = self._vectorize_profile(candidate_detail, candidate_prefs, distance_km)
+        
+        cosine_score = self._cosine_similarity(user_vector, candidate_vector)
+        cosine_percentage = round(cosine_score * 100, 2)
+        
+        score_breakdown["cosine_similarity_score"] = cosine_percentage
+        score_breakdown["total_score"] = min(100, round(cosine_percentage))
+        # print(f"CF cosine_similarity_score filtered: {score_breakdown["cosine_similarity_score"]}")
+
+        #  detailed breakdown 
+        feature_scores, matched, unmatched = self._calculate_detailed_breakdown(
+            user_detail, user_interests, candidate_detail, candidate_prefs
+        )
+        
         score_breakdown["feature_scores"] = {k: round(v, 3) for k, v in feature_scores.items()}
-        score_breakdown["feature_match_list"] = {"matched": matched_features, "unmatched": unmatched_features}
-        score_breakdown["total_score"] = total_percent
-        score_breakdown["compatibility_summary"] = f"Features matched: {len(matched_features)}; Compatibility: {total_percent}%"
+        score_breakdown["feature_match_list"] = {"matched": matched, "unmatched": unmatched}
 
+        # Location info
+        if distance_km is not None:
+            if distance_km <= 20:
+                loc_status = "Very close"
+            elif distance_km <= 50:
+                loc_status = "Nearby"
+            elif distance_km <= 100:
+                loc_status = "Moderate distance"
+            else:
+                loc_status = "Long distance"
+            score_breakdown["location"]["status"] = loc_status
+            score_breakdown["location"]["distance_km"] = round(distance_km, 2)
+
+        score_breakdown["compatibility_summary"] = (
+            f"Cosine Similarity: {cosine_percentage}% | "
+            f"Features matched: {len(matched)}/{len(matched) + len(unmatched)}"
+
+# 
+        )
+
+        print(f" cosine_similarity_score filtered: {cosine_percentage}%")
         return score_breakdown
 
     # --- DB helpers ---
@@ -342,10 +468,11 @@ class MatchAlgorithm:
             distance = self._haversine(user_location["lat"], user_location["lng"], candidate_location["lat"], candidate_location["lng"])
 
         compatibility = self._calculate_compatibility(user_detail, user_interests, detail, looking_for, distance or 0)
-        if not compatibility["filter_passed"]:
-            return None
-
-        return {
+        
+        hobbies = self._to_list(detail.get("hobbies", []))
+        personality = self._to_list(detail.get("personality", []))
+        
+        profile = {
             "id": str(candidate["_id"]),
             "name": candidate.get("name"),
             "email": email,
@@ -354,7 +481,7 @@ class MatchAlgorithm:
             "religion": detail.get("religion"),
             "caste": detail.get("caste"),
             "marital_status": detail.get("marital_status"),
-            "height": looking_for.get("height"),
+            "height": detail.get("height"),
             "pet_preference": looking_for.get("pet_preference"),
             "family_type": looking_for.get("family_type"),
             "family_values": looking_for.get("family_values"),
@@ -364,14 +491,20 @@ class MatchAlgorithm:
             "profession": detail.get("profession"),
             "education": detail.get("education"),
             "bio": detail.get("caption", "No bio available."),
-            "personality": detail.get("personality", []),
-            "hobbies": detail.get("hobbies", []),
+            "personality": personality,
+            "hobbies": hobbies,
             "images": [self._build_photo_url(request, candidate.get("photo"))],
             "is_match": email in liked_by_emails,
             "distance_km": round(distance, 2) if distance else None,
             "compatibility_score": compatibility["total_score"],
+            "is_compatible": compatibility["filter_passed"],
+            "incompatible_side": compatibility.get("incompatible_side"),
             "score_breakdown": compatibility
         }
+        print(f"Compatibility for {candidate.get('name')} ({email}): {compatibility['total_score']}")
+        return profile
+        print(f"Compatibility for {candidate.get('name')}: {compatibility['total_score']}")
+
 
     # --- Main API ---
     def get_profiles(self, request, current_email):
@@ -390,7 +523,20 @@ class MatchAlgorithm:
             profile = self._process_candidate(request, candidate, liked_emails, liked_by_emails, user_detail, user_interests, user_location)
             if profile:
                 profiles.append(profile)
-        profiles.sort(key=lambda x: -x["compatibility_score"])
+        
+      
+        def sort_key(profile):
+            is_compatible = profile.get("is_compatible", True)
+            score = profile["compatibility_score"]
+            if not is_compatible or score == "Not Compatible":
+                return (1, 0)  # (not compatible=1, score=0)
+            return (0, -score)  
+        
+        profiles.sort(key=sort_key)
+        
+        personality_pref = self._to_list(looking_for.get("personality", []))
+        hobbies_user = self._to_list(user_detail.get("hobbies", []))
+        
         return {
             "profiles": profiles,
             "logged_in_user": {
@@ -411,8 +557,8 @@ class MatchAlgorithm:
                 "education": user_detail.get("education"),
                 "profession": user_detail.get("profession"),
                 "bio": user_detail.get("caption", "No bio available."),
-                "personality": looking_for.get("personality", []),
-                "hobbies": user_detail.get("hobbies", []),
+                "personality": personality_pref,
+                "hobbies": hobbies_user,
                 "images": [self._build_photo_url(request, user.get("photo"))],
                 "looking_for": looking_for
             }

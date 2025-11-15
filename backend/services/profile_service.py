@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 class ProfileService:
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
-    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    MAX_FILE_SIZE = 5 * 1024 * 1024 
 
     def allowed_file(self, filename):
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in self.ALLOWED_EXTENSIONS
@@ -33,7 +33,18 @@ class ProfileService:
             user_obj_id = user["_id"] if user else None
         return user, user_obj_id
 
-    # ---------------- PROFILE GET/UPDATE ---------------- #
+    def _to_list(self, val):
+        if not val:
+            return []
+        if isinstance(val, list):
+            return [str(v).strip() for v in val if v]
+        if isinstance(val, str):
+            if "," in val:
+                return [s.strip() for s in val.split(",") if s.strip()]
+            return [s.strip() for s in val.split() if s.strip()] if " " in val else [val.strip()]
+        return [str(val)]
+
+    # profile
     def get_profile(self, user_id):
         mongo = current_app.mongo
         user, user_obj_id = self.get_user_by_id_or_email(user_id)
@@ -47,7 +58,7 @@ class ProfileService:
             "name": user.get("name"),
             "email": user.get("email"),
             "photo": user.get("photo"),
-            "hobbies": details.get("hobbies", []) if details else [],
+            "hobbies": self._to_list(details.get("hobbies", [])) if details else [],
             "interestsCompleted": user.get("interests_completed", False),
         }
 
@@ -56,10 +67,11 @@ class ProfileService:
                 "age": details.get("age"),
                 "height": details.get("height"),
                 "caste": details.get("caste"),
-                "personality": details.get("personality"),
+                "personality": self._to_list(details.get("personality", [])),
                 "gender": details.get("gender"),
                 "location": details.get("location"),
                 "maritalStatus": details.get("marital_status"),
+                "marital_status": details.get("marital_status"),
                 "religion": details.get("religion"),
                 "education": details.get("education"),
                 "profession": details.get("profession"),
@@ -67,7 +79,17 @@ class ProfileService:
             })
 
         if interests:
-            profile["lookingFor"] = interests.get("looking_for", {})
+            looking_for = interests.get("looking_for", {})
+            if looking_for:
+                normalized_looking_for = {}
+                for key, value in looking_for.items():
+                    if key in ["hobbies", "personality", "caste", "gender"]:
+                        normalized_looking_for[key] = self._to_list(value)
+                    else:
+                        normalized_looking_for[key] = value
+                profile["lookingFor"] = normalized_looking_for
+            else:
+                profile["lookingFor"] = looking_for
 
         return jsonify(profile), 200
 
@@ -108,7 +130,7 @@ class ProfileService:
 
         return self.get_profile(str(user_obj_id))
 
-    # ---------------- MAIN PROFILE PHOTO ---------------- #
+    # profile photo
     def upload_photo(self, user_id, file):
         mongo = current_app.mongo
         validation_error = self.validate_file(file)
@@ -138,7 +160,7 @@ class ProfileService:
                 os.remove(filepath)
             return jsonify({"error": "Failed to upload image"}), 500
 
-    # ---------------- GALLERY PHOTOS ---------------- #
+    # gallery photo
     def upload_gallery_photo(self, user_id, file):
         mongo = current_app.mongo
         validation_error = self.validate_file(file)
@@ -189,17 +211,14 @@ class ProfileService:
             img["_id"] = str(img["_id"])
         return jsonify(images), 200
 
-    # ---------------- FILE SERVING ---------------- #
     def serve_uploaded_file(self, filename):
         upload_folder = current_app.config.get("UPLOAD_FOLDER", os.path.join(os.getcwd(), "uploads"))
         try:
             return send_from_directory(upload_folder, filename)
         except FileNotFoundError:
             return jsonify({"error": "File not found"}), 404
-        
 
-
-    # ---------------- DELETE GALLERY PHOTO ---------------- #
+    # delete photo
     def delete_gallery_photo(self, user_id, image_id):
         from bson.objectid import ObjectId
         mongo = current_app.mongo
@@ -227,7 +246,6 @@ class ProfileService:
             except Exception as e:
                 current_app.logger.warning(f"Failed to remove file: {e}")
 
-        # Delete from DB
         mongo.db.images.delete_one({"_id": image_obj_id})
 
         return jsonify({"success": True, "message": "Image deleted successfully"}), 200

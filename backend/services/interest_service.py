@@ -19,29 +19,31 @@ class InterestService:
             "age_group": data.get("partner_age"),
             "gender": data.get("partner_gender"),
             "height": data.get("partner_height"),
-            "marital_status": data.get("partner_marital_status"),
-            "religion": data.get("partner_religion"),
-            "caste": data.get("partner_caste"),
-            "personality": data.get("partner_personality", []),
-            # "hobbies": data.get("partner_hobbies", []),
+            "marital_status": data.get("partner_marital_status",[]),
+            "religion": data.get("partner_religion", []),  # list
+            "caste": data.get("partner_caste", []),        # list
+            "personality": data.get("partner_personality"),
             "pet_preference": data.get("partner_pets"),
             "education_level": data.get("partner_education"),
             "profession": data.get("partner_profession"),
             "family_type": data.get("partner_family_type"),
             "family_values": data.get("partner_family_values"),
             "living_preference": data.get("partner_living_pref"),
-            "long_distance": data.get("partner_long_distance")
+            "long_distance": data.get("partner_long_distance"),
         }
 
         self.user_interests.update_one(
             {"user_id": user_id},
             {"$set": {"user_id": user_id, "looking_for": partner_preferences}},
-            upsert=True
+            upsert=True,
         )
 
         self.users.update_one(
             {"_id": user_id},
-            {"$set": {"interests_completed": True}}
+            {"$set": {"interests_completed": True}},
         )
 
-        return {"success": True, "message": "Interests and partner preferences saved successfully."}, 200
+        return {
+            "success": True,
+            "message": "Interests and partner preferences saved successfully."
+        }, 200

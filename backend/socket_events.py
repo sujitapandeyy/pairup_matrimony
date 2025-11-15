@@ -4,6 +4,7 @@ from datetime import datetime
 from bson import ObjectId
 from utils.encryption import encrypt_message, decrypt_message
 
+# initializing socketio also currentlyy available user tracking 
 socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 online_users = set()
 
@@ -21,6 +22,7 @@ def serialize_objectid(obj):
         return str(obj)
     return obj
 
+# Attach Socket.IO events to the Flask app.
 def register_socketio_events(app):
     @socketio.on('connect')
     def handle_connect():
@@ -58,13 +60,13 @@ def register_socketio_events(app):
 
         room = get_room_id(data['sender'], data['receiver'])
         
-        # Encrypt the message before saving
+        # Encrypting message 
         encrypted_msg = encrypt_message(data['message'])
 
         chat = {
             "sender": data['sender'],
             "receiver": data['receiver'],
-            "message": encrypted_msg,   # store encrypted
+            "message": encrypted_msg,  
             "timestamp": datetime.utcnow()
         }
 
@@ -75,13 +77,12 @@ def register_socketio_events(app):
         except Exception as e:
             print(" Error saving message to DB:", str(e))
 
-        # Decrypt message before emitting back to users
         decrypted_msg = decrypt_message(chat['message'])
 
         emit('receive_message', {
             "sender": chat["sender"],
             "receiver": chat["receiver"],
-            "message": decrypted_msg,    # send decrypted message
+            "message": decrypted_msg,  
             "timestamp": chat["timestamp"].isoformat(),
             "_id": chat.get('_id'),
         }, room=room)

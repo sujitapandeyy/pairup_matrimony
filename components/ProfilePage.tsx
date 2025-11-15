@@ -70,7 +70,6 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     fetchProfile();
   }, [userId]);
 
-  // ---------------- HANDLE PROFILE PHOTO (main) ---------------- //
   async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];

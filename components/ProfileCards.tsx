@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import {
   Heart,
   X,
@@ -16,6 +17,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { getCompatibilityColor } from "@/lib/utils/match";
+import { getFullImageUrl } from "@/lib/utils/image";
+import { getTimeAgoKathmandu } from "@/lib/utils/date";
 
 // Types
 interface Profile {
@@ -30,29 +34,13 @@ interface Profile {
   hobbies?: string[];
   compatibility_score?: number;
   distance_km?: number;
-}
-
-interface User {
-  email: string;
+  is_compatible?: boolean;
 }
 
 // Constants
-const MAX_SUGGESTED_PROFILES = 5;
-const MAX_NEARBY_PROFILES = 6;
+const MAX_SUGGESTED_PROFILES = 4;
+const MAX_NEARBY_PROFILES = 4;
 const DEFAULT_IMAGE = "/default-profile.jpg";
-
-// Helper functions
-const getCompatibilityColor = (score: number): string => {
-  if (score >= 90) return "bg-emerald-600";
-  if (score >= 80) return "bg-green-600";
-  if (score >= 70) return "bg-lime-600";
-  if (score >= 60) return "bg-yellow-500";
-  if (score >= 50) return "bg-amber-500";
-  if (score >= 40) return "bg-orange-500";
-  if (score >= 30) return "bg-orange-600";
-  if (score >= 20) return "bg-red-500";
-  return "bg-red-700";
-};
 
 const formatLocation = (location: string | undefined): string => {
   if (!location) return "Unknown";
@@ -65,34 +53,20 @@ const getUsernameFromName = (name: string): string => {
 
 const ProfileCards: React.FC = () => {
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   // State
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [email, setEmail] = useState<string | null>(null);
   const [suggestedProfiles, setSuggestedProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSwiping, setIsSwiping] = useState(false);
   const [nearbyProfiles, setNearbyProfiles] = useState<Profile[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(true);
 
-  // Initialize user from localStorage
-  useEffect(() => {
-    const storedUser = localStorage.getItem("pairupUser");
-    if (storedUser) {
-      try {
-        const parsed: User = JSON.parse(storedUser);
-        if (parsed?.email) {
-          setEmail(parsed.email);
-        }
-      } catch (error) {
-        console.error("Error parsing user from localStorage:", error);
-        toast.error("Error loading user data");
-      }
-    }
-  }, []);
+  // Get email from session
+  const email = session?.user?.email;
 
-  // Fetch nearby profiles
   const fetchNearbyProfiles = useCallback(async () => {
     if (!email) return;
     setNearbyLoading(true);
@@ -123,32 +97,17 @@ const ProfileCards: React.FC = () => {
     if (email) fetchNearbyProfiles();
   }, [email, fetchNearbyProfiles]);
 
-  // Fetch suggested profiles
   const fetchSuggestedProfiles = useCallback(
     async (userEmail: string, allProfiles: Profile[]): Promise<Profile[]> => {
       try {
         const res = await api.get(
-          `/matches/similar_to_liked?email=${encodeURIComponent(userEmail)}`
+          `/matches/recommended_users?email=${encodeURIComponent(userEmail)}`
         );
         let similar: Profile[] = res.data || [];
-
-        if (similar.length < MAX_SUGGESTED_PROFILES) {
-          const remaining = MAX_SUGGESTED_PROFILES - similar.length;
-          const availableProfiles = allProfiles.filter(
-            (p) => !similar.some((s) => s.email === p.email)
-          );
-          const random = [...availableProfiles]
-            .sort(() => 0.5 - Math.random())
-            .slice(0, remaining);
-          similar = [...similar, ...random];
-        }
-
         return similar.slice(0, MAX_SUGGESTED_PROFILES);
       } catch (error) {
         console.error("Error fetching similar profiles:", error);
-        return [...allProfiles]
-          .sort(() => 0.5 - Math.random())
-          .slice(0, MAX_SUGGESTED_PROFILES);
+        return [];
       }
     },
     []
@@ -164,36 +123,40 @@ const ProfileCards: React.FC = () => {
         `/matches/get_profiles?email=${encodeURIComponent(email)}`
       );
       const allProfiles: Profile[] = res.data.profiles.filter(
-        (p: Profile) => p.email !== email
-      );
+  (p: Profile) => p.email !== email
+);
 
-      // Always sort by compatibility score (highest first)
-      const sortedProfiles = [...allProfiles].sort((a, b) => {
-        const scoreA = a.compatibility_score ?? 0;
-        const scoreB = b.compatibility_score ?? 0;
-        return scoreB - scoreA;
-      });
-      
+const compatibleProfiles = allProfiles.filter((p: Profile) => {
+  const isCompatible = p.is_compatible !== false;
+  const compatibilityScore = p.compatibility_score;
+  
+  return isCompatible && compatibilityScore && compatibilityScore > 0;
+});
+
+const sortedProfiles = [...compatibleProfiles].sort((a, b) => {
+  const scoreA = a.compatibility_score ?? 0;
+  const scoreB = b.compatibility_score ?? 0;
+  return scoreB - scoreA;
+});
+
       setProfiles(sortedProfiles);
 
       const suggested = await fetchSuggestedProfiles(email, sortedProfiles);
       setSuggestedProfiles(suggested);
 
-      // Check if returning from profile page (has lastViewedProfile in sessionStorage)
+      // Handle returning from profile page
       const lastViewed = sessionStorage.getItem("lastViewedProfile");
       const returningFromProfile = sessionStorage.getItem("returningFromProfile");
-      
+
       if (lastViewed && returningFromProfile === "true") {
         const idx = sortedProfiles.findIndex((p) => p.email === lastViewed);
         if (idx !== -1) {
           setCurrentIndex(idx);
-          // Clear the returning flag but keep lastViewedProfile
           sessionStorage.removeItem("returningFromProfile");
           return;
         }
       }
 
-      // Default to first profile (highest compatibility)
       setCurrentIndex(0);
     } catch (error) {
       console.error("Error fetching profiles:", error);
@@ -202,7 +165,20 @@ const ProfileCards: React.FC = () => {
       setIsLoading(false);
     }
   }, [email, fetchSuggestedProfiles]);
+// Add this useEffect to periodically refresh suggestions (optional)
+useEffect(() => {
+  if (!email) return;
 
+  // Refresh suggestions every 30 seconds if user has likes
+  const interval = setInterval(async () => {
+    if (suggestedProfiles.length > 0) {
+      const suggested = await fetchSuggestedProfiles(email, profiles);
+      setSuggestedProfiles(suggested);
+    }
+  }, 30000); // 30 seconds
+
+  return () => clearInterval(interval);
+}, [email, profiles, suggestedProfiles.length, fetchSuggestedProfiles]);
   useEffect(() => {
     if (email) fetchProfiles();
   }, [email, fetchProfiles]);
@@ -234,22 +210,16 @@ const ProfileCards: React.FC = () => {
         const suggested = await fetchSuggestedProfiles(email, profiles);
         setSuggestedProfiles(suggested);
       } else {
-        setSuggestedProfiles((prev) => {
-          let updated = prev.filter((p) => p.email !== targetProfile.email);
-          if (updated.length < MAX_SUGGESTED_PROFILES) {
-            const shownEmails = new Set([
-              ...updated.map((p) => p.email),
-              targetProfile.email,
-            ]);
-            const candidatesToAdd = profiles
-              .filter((p) => !shownEmails.has(p.email))
-              .sort(() => 0.5 - Math.random())
-              .slice(0, MAX_SUGGESTED_PROFILES - updated.length);
-            updated = [...updated, ...candidatesToAdd];
-          }
-          return updated.slice(0, MAX_SUGGESTED_PROFILES);
-        });
+        //  Don't add random unfiltered profiles to suggested
+        setSuggestedProfiles((prev) =>
+          prev.filter((p) => p.email !== targetProfile.email)
+        );
       }
+      await fetchNearbyProfiles(); 
+
+      // setNearbyProfiles((prev) =>
+      //   prev.filter((p) => p.email !== targetProfile.email)
+      // );
     } catch (error) {
       console.error("Swipe error:", error);
       toast.error("Failed to process swipe");
@@ -258,7 +228,7 @@ const ProfileCards: React.FC = () => {
     }
   };
 
-  // Navigate to profile in card view (not redirecting to profile page)
+  // Navigate to profile
   const navigateToProfile = useCallback(
     (profile: Profile) => {
       const idx = profiles.findIndex((p) => p.email === profile.email);
@@ -274,7 +244,7 @@ const ProfileCards: React.FC = () => {
     [profiles]
   );
 
-  // View full profile - redirects to profile page
+  // View full profile
   const viewFullProfile = useCallback(() => {
     const currentProfile = profiles[currentIndex];
     if (currentProfile?.id || currentProfile?.email) {
@@ -286,29 +256,31 @@ const ProfileCards: React.FC = () => {
     }
   }, [currentIndex, profiles, router]);
 
-  // Open nearby profile directly in profile page
+  // Open profile directly
   const openProfileDirectly = (profile: Profile) => {
     sessionStorage.setItem("lastViewedProfile", profile.email);
     sessionStorage.setItem("returningFromProfile", "true");
     router.push(`/user/${profile.id || profile.email}`);
   };
 
-  // Loading / empty states
-  if (isLoading)
+  // Loading states
+  if (status === "loading" || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[600px]">
         <Loader2 className="w-8 h-8 animate-spin text-pink-500" />
       </div>
     );
+  }
 
-  if (!email)
+  if (!email) {
     return (
       <div className="text-center py-10 text-gray-600">
         Please log in to view profiles
       </div>
     );
+  }
 
-  if (profiles.length === 0)
+  if (profiles.length === 0) {
     return (
       <div className="text-center py-10">
         <div className="text-gray-600 mb-4">No more profiles to show</div>
@@ -317,6 +289,7 @@ const ProfileCards: React.FC = () => {
         </Button>
       </div>
     );
+  }
 
   const currentProfile = profiles[currentIndex];
 
@@ -324,9 +297,9 @@ const ProfileCards: React.FC = () => {
     <div className="flex flex-col gap-6 px-4 pb-8 w-full max-w-screen-xl mx-auto">
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Profile Card */}
-        <div className="flex-1 flex flex-col items-center gap-6 ">
-          <div className="w-4/8  flex-1 flex flex-col items-center gap-6 rounded-3xl ml-50">
-            <Card className="p-2  max-w-md overflow-hidden shadow-2xl border-0 rounded-3xl transform transition-all duration-300 ">
+        <div className="flex-1 flex flex-col items-center gap-6">
+          <div className="w-4/8 flex-1 flex flex-col items-center gap-6 rounded-3xl ml-50">
+            <Card className="p-2 max-w-md overflow-hidden shadow-2xl border-0 rounded-3xl transform transition-all duration-300">
               <div
                 className="relative cursor-pointer h-[600px] group rounded-3xl"
                 onClick={viewFullProfile}
@@ -346,7 +319,7 @@ const ProfileCards: React.FC = () => {
                 />
 
                 {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent rounded-3xl transition-transform duration-500 group-hover:scale-101 " />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent rounded-3xl transition-transform duration-500 group-hover:scale-101" />
 
                 {/* Profile info overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white pointer-events-none">
@@ -409,7 +382,6 @@ const ProfileCards: React.FC = () => {
                             ))}
                         </div>
                       )}
-                    {/* Action Buttons */}
                   </div>
                 </div>
 
@@ -458,50 +430,54 @@ const ProfileCards: React.FC = () => {
 
         {/* Sidebar */}
         <div className="w-full lg:w-[360px] space-y-6">
-          {/* Suggested Users - Stories Style */}
-          <div className="p-2">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">
-              Suggested for you
-            </h3>
-            <div className="flex gap-4 overflow-x-auto pb-2 ml-2 scrollbar-hide">
-              {suggestedProfiles.map((profile) => (
-                <div
-                  key={profile.email}
-                  className="flex flex-col items-center gap-2 cursor-pointer flex-shrink-0 group"
-                  onClick={() => navigateToProfile(profile)}
-                >
-                  <div
-                    className={`w-16 h-16 rounded-full p-[px] transition-all duration-300 ${
-                      currentProfile?.email === profile.email
-                        ? "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200 scale-105"
-                        : "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200"
-                    }`}
-                  >
-                    <div className="w-full h-full rounded-full border-2 border-white overflow-hidden">
-                      <img
-                        src={profile.images?.[0] || DEFAULT_IMAGE}
-                        alt={profile.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
-                    </div>
-                  </div>
-                  <span className="text-xs text-gray-700 max-w-[70px] truncate font-medium">
-                    {profile.name.split(" ")[0]}
-                  </span>
-                </div>
-              ))}
+          {/* Suggested Users */}
+          {suggestedProfiles.length > 0 && (
+  <div className="p-2">
+    <h3 className="text-sm font-semibold text-gray-700 mb-4">
+      Suggested for you
+    </h3>
+    <div className="flex gap-4 overflow-x-auto pb-2 ml-2 scrollbar-hide">
+      {suggestedProfiles.map((profile) => (
+        <div
+          key={profile.email}
+          className="flex flex-col items-center gap-2 cursor-pointer flex-shrink-0 group"
+          onClick={() => navigateToProfile(profile)}
+        >
+          <div
+            className={`w-16 h-16 rounded-full p-[px] transition-all duration-300 ${
+              currentProfile?.email === profile.email
+                ? "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200 scale-105"
+                : "object-cover ring-2 ring-gray-200 group-hover:ring-pink-200"
+            }`}
+          >
+            <div className="w-full h-full rounded-full border-2 border-white overflow-hidden">
+              <img
+                src={profile.images?.[0] || DEFAULT_IMAGE}
+                alt={profile.name}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+              />
             </div>
           </div>
+          <span className="text-xs text-gray-700 max-w-[70px] truncate font-medium">
+            {profile.name.split(" ")[0]}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
           {/* People Near You */}
-          <div className="space-y-3  bg-white p-4 rounded-3xl">
+          <div className="space-y-3 bg-white p-4 rounded-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">
               People Near you
             </h3>
             {nearbyLoading ? (
               <p className="text-xs text-gray-500">Loading nearby people...</p>
             ) : nearbyProfiles.length === 0 ? (
-              <p className="text-xs text-gray-500">No nearby people found</p>
+              <p className="text-xs text-gray-500">
+                No nearby people found. Update your preferences!
+              </p>
             ) : (
               nearbyProfiles.map((profile) => (
                 <div

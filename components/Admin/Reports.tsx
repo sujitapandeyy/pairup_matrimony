@@ -31,7 +31,7 @@ const Reports = () => {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6 text-gray-800">User Reports</h1>
 
       {loading ? (
@@ -59,7 +59,7 @@ const Reports = () => {
                   <span className="font-semibold">Proof:</span>
                   <div className="mt-2">
                     <img
-                      src={`${process.env.NEXT_PUBLIC_BACKEND_URL}/uploads/reports/${report.proof}`}
+                      src={`${process.env.NEXT_PUBLIC_BACKEND_URL}/uploads/${report.proof}`}
                       alt="Proof"
                       className="max-w-xs border rounded-md shadow-sm"
                     />

@@ -4,13 +4,12 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import api from "@/lib/api";
-import { Heart } from "lucide-react";
+import { signIn, getSession } from "next-auth/react";
+import { TokenManager } from "@/lib/tokenManager";
 
-export default function Login() {
+export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
-
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,65 +21,63 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await api.post("/auth/login", formData, {
-        headers: { "Content-Type": "application/json" },
+      const result = await signIn("credentials", {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
       });
 
-      const data = res.data;
+      console.log("SignIn result:", result);
 
-      if (res.status === 200 && data.success) {
-        const { id, name, email, interests_completed, role, status } =
-          data.user;
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
 
-        if (status !== "active") {
-          toast.error(
-            `Your account is currently '${status}'. Please contact support.`
-          );
-          setLoading(false);
-          return;
-        }
+      if (result?.ok) {
+        // Wait for session to be set
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
-        const completed =
-          interests_completed === true || interests_completed === "true";
+        const session = await getSession();
 
-        localStorage.setItem(
-          "pairupUser",
-          JSON.stringify({
-            id,
-            email,
-            name,
-            interests_completed: completed,
-            role,
-          })
-        );
+        if (session?.accessToken) {
+          TokenManager.setTokens(session.accessToken, session.refreshToken);
+          toast.success("Login successful!");
 
-        toast.success("Login successful!");
+          // Redirect based on role and interests completion
+          if (session.user.role === "admin") {
+            router.push("/admin/dashboard");
+          } else if (!session.user.interests_completed) {
+            router.push("/interests");
+          } else {
+            router.push("/user_dashboard");
+          }
 
-        if (role === "admin") {
-          router.push("/admin/dashboard");
-        } else if (completed) {
-          router.push("/user_dashboard");
+          router.refresh();
         } else {
-          router.push("/interests");
+          toast.error("Login successful but token not received");
         }
-      } else {
-        toast.error(data.message || "Login failed. Please try again.");
       }
     } catch (err) {
-      toast.error("Invalid Credentials.");
+      console.error("Login error:", err);
+      toast.error("Cannot connect to server. Please check if the backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12 "style={{ backgroundImage: `url("img/bg1.jpg")`,     backgroundRepeat: "no-repeat",
-backgroundSize: "cover",backgroundPosition: "center" }}>
+    <div
+      className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12"
+      // style={{
+      //   backgroundImage: `url("img/bg1.jpg")`,
+      //   backgroundRepeat: "no-repeat",
+      //   backgroundSize: "cover",
+      //   backgroundPosition: "center",
+      // }}
+    >
       <div className="bg-white shadow-xl rounded-xl max-w-md w-full p-8">
-        <h1 className="text-3xl font-serif font-bold text-pink-00 mb-4 text-center flex items-center justify-center gap-2">
-          {/* <span className="w-10 h-10 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center">
-            <Heart className="w-6 h-6 text-white" />
-          </span> */}
+        <h1 className="text-3xl font-serif font-bold text-pink-600 mb-4 text-center flex items-center justify-center gap-2">
           Welcome Back
         </h1>
         <p className="text-center text-pink-600 mb-8 font-medium">
@@ -102,7 +99,7 @@ backgroundSize: "cover",backgroundPosition: "center" }}>
               value={formData.email}
               onChange={handleChange}
               placeholder="Enter your email"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-400 transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400 transition"
               required
             />
           </div>
@@ -121,7 +118,7 @@ backgroundSize: "cover",backgroundPosition: "center" }}>
               value={formData.password}
               onChange={handleChange}
               placeholder="Enter your password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-400 transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400 transition"
               required
             />
           </div>
@@ -137,10 +134,10 @@ backgroundSize: "cover",backgroundPosition: "center" }}>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Don’t have an account?{" "}
+            Don't have an account?{" "}
             <Link
               href="/register"
-              className="text-maroon-700 font-semibold hover:underline"
+              className="text-orange-700 font-semibold hover:underline"
             >
               Register here
             </Link>

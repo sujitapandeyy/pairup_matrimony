@@ -51,24 +51,60 @@ class ChatService:
         if not user or not chat_with or not timestamp:
             return jsonify({"error": "Missing fields"}), 400
 
+        try:
+            #  timestamp to datetime for compare
+            read_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        except Exception:
+            return jsonify({"error": "Invalid timestamp format"}), 400
+
         mongo = current_app.mongo
-        mongo.db.read_receipts.update_one(
-            {"user": user, "chat_with": chat_with},
-            {"$set": {"last_read": timestamp}},
-            upsert=True
+        
+        result = mongo.db.chat_messages.update_many(
+            {
+                'sender': chat_with,
+                'receiver': user,
+                'timestamp': {'$lte': read_time},
+                'read_at': {'$exists': False}  
+            },
+            {
+                '$set': {
+                    'read_at': read_time,
+                    'read': True
+                }
+            }
         )
-        return jsonify({"message": "Read receipt updated"})
+        
+        return jsonify({
+            "message": "Read receipt updated",
+            "updated_count": result.modified_count
+        })
 
     def get_read_receipt(self, user, chat_with):
         if not user or not chat_with:
             return jsonify({"error": "Missing fields"}), 400
 
         mongo = current_app.mongo
-        doc = mongo.db.read_receipts.find_one({
-            "user": user,
-            "chat_with": chat_with
-        })
+        
+        last_read_msg = mongo.db.chat_messages.find_one(
+            {
+                'sender': chat_with,
+                'receiver': user,
+                'read': True
+            },
+            sort=[('read_at', -1)]
+        )
+        
+        # return last rea time
+        if last_read_msg and last_read_msg.get('read_at'):
+            read_at = last_read_msg['read_at']
+            if isinstance(read_at, datetime):
+                last_read = read_at.isoformat()
+            else:
+                try:
+                    last_read = datetime.fromisoformat(str(read_at)).isoformat()
+                except Exception:
+                    last_read = None
+        else:
+            last_read = None
 
-        return jsonify({"last_read": doc.get("last_read") if doc else None})
-    
-    
+        return jsonify({"last_read": last_read})
